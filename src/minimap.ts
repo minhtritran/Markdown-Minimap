@@ -172,7 +172,22 @@ export class Minimap implements PointerHost {
     };
 
     private checkFolds = () => {
-        if (!this.content) return;
+        if (this.syncFoldState()) void this.onResize();
+    };
+
+    /**
+     * Re-read the note's fold state and fold the panel to match. Returns
+     * whether anything actually moved, so the caller can decide whether a
+     * re-measure is warranted.
+     *
+     * Called from the scroll settle and from `onResize` as well as from the
+     * observer, because the observer alone is not enough: CodeMirror only
+     * renders near the viewport, so folding a section that is already below it
+     * changes the editor's height without touching a single node the observer
+     * can see.
+     */
+    private syncFoldState(): boolean {
+        if (!this.content) return false;
         // Collapsing the properties widget changes its height without changing
         // anything the Markdown renderer produced, so re-pin rather than
         // re-render the whole note. Checked before the signature, since the
@@ -180,14 +195,11 @@ export class Minimap implements PointerHost {
         const resized = this.syncFrontmatterHeight();
         const heads = readFoldHeads(this.view);
         const signature = heads.join(",");
-        if (signature === this.foldSignature) {
-            if (resized) void this.onResize();
-            return;
-        }
+        if (signature === this.foldSignature) return resized;
         this.foldSignature = signature;
         this.applyFolds(heads);
-        void this.onResize();
-    };
+        return true;
+    }
 
     /**
      * Source mode needs none of this: every line takes its height straight from
@@ -637,6 +649,7 @@ export class Minimap implements PointerHost {
     // positions within a heading's span drift until this runs.
     settleAfterScroll = () => {
         if (this.isRawSourceMode()) this.refreshSourceLineHeights();
+        this.checkFolds();
         this.updateSliderScroll();
     };
 
@@ -648,6 +661,9 @@ export class Minimap implements PointerHost {
         // CodeMirror replaces its height estimates with measurements as lines
         // are rendered, so refresh from it before re-anchoring.
         if (this.isRawSourceMode()) this.refreshSourceLineHeights();
+        // Fold the panel before it is measured, not after. Direct rather than
+        // via checkFolds, which would call back into here.
+        this.syncFoldState();
         // Layout may have shifted every heading, so re-measure the anchors
         // before they are used to place the slider.
         this.anchors.capture(
