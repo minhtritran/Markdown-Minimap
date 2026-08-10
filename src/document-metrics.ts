@@ -170,6 +170,38 @@ function reserveShift(
 }
 
 /**
+ * The panel's counterpart to the contentless space below the note's last line —
+ * the file margin plus the room Obsidian leaves for scrolling past the end.
+ *
+ * Copying those pixels across verbatim looks right and is not: the panel does
+ * not lay content out at the same height the note does, so a verbatim margin is
+ * the one stretch of the panel drawn at a different scale from everything above
+ * it. The thumb changes size as it crosses into it — growing where the panel
+ * runs shorter than the note, shrinking where it runs taller — over the last
+ * viewport-height of the scroll, which is where it is most visible.
+ *
+ * Scaling it by the ratio the panel actually achieves makes the whole panel one
+ * consistent picture of the note, so the thumb keeps its size to the bottom.
+ * The ratio is bounded because a pane mid-layout can report nonsense, and an
+ * absurd margin is worse than a verbatim one.
+ */
+function scaleTrailingSpace(
+    this: void,
+    content: HTMLElement,
+    scroller: HTMLElement | null,
+    editorTrailing: number
+): number {
+    if (editorTrailing <= 0 || !scroller) return Math.max(0, editorTrailing);
+
+    const applied = pixels(computedStyle(content)?.paddingBottom);
+    const panelContent = content.scrollHeight - applied;
+    const editorContent = scroller.scrollHeight - editorTrailing;
+    if (panelContent <= 0 || editorContent <= 0) return editorTrailing;
+
+    return editorTrailing * clamp(panelContent / editorContent, 0.25, 4);
+}
+
+/**
  * Rendering at the pane's full width made lines wrap at different points than
  * the note itself, so the panel takes the note's width, margins and typography.
  */
@@ -203,30 +235,35 @@ export function mirrorDocumentMetrics(
         pixels(computedStyle(scroller)?.paddingTop) +
         pixels(computedStyle(sizer)?.paddingTop);
     container.style.setProperty("--minimap-doc-padding-top", `${paddingTop}px`);
-    // The file margin below the last line is part of the note's scrollable
-    // height, so the panel needs its counterpart to end where the note ends.
+    // The file margin below the last line, and the room Obsidian leaves for
+    // scrolling past the end, are both part of the scroll range the thumb
+    // travels. The panel needs its own counterpart rather than the mapping
+    // pretending they are not there.
+    const editorTrailing =
+        pixels(computedStyle(scroller)?.paddingBottom) +
+        measureTrailingPadding(element, readMode, scroller);
     container.style.setProperty(
-        "--minimap-doc-padding-bottom",
-        `${pixels(computedStyle(scroller)?.paddingBottom)}px`
-    );
-    // Obsidian lets you scroll past the end of a note. That space is part of
-    // the scroll range the thumb travels, so the panel mirrors it rather than
-    // the mapping pretending it is not there.
-    container.style.setProperty(
-        "--minimap-scroll-past-end",
-        `${measureTrailingPadding(element, readMode, scroller)}px`
+        "--minimap-doc-trailing",
+        `${scaleTrailingSpace(content, scroller, editorTrailing)}px`
     );
 
     // Published on the view element, not the panel, so it survives re-renders.
-    const shift = options.reserveSpace
-        ? reserveShift(scroller, textWidth, options.stripLeft)
-        : 0;
-    if (shift > 0) {
-        element.style.setProperty("--minimap-content-shift", `${shift}px`);
-        element.classList.add("minimap-content-shifted");
-    } else {
-        element.style.removeProperty("--minimap-content-shift");
-        element.classList.remove("minimap-content-shifted");
+    // A background tab measures every rect at 0, which reads as "no strip to
+    // move clear of" and would retract the shift from every tab navigated away
+    // from. The note then painted unshifted on the way back and slid into place
+    // once the measurement landed, which is what the shift looked like moving.
+    // Treated as unmeasurable instead, the last shift simply stands.
+    if (options.stripLeft > 0 || !options.reserveSpace) {
+        const shift = options.reserveSpace
+            ? reserveShift(scroller, textWidth, options.stripLeft)
+            : 0;
+        if (shift > 0) {
+            element.style.setProperty("--minimap-content-shift", `${shift}px`);
+            element.classList.add("minimap-content-shifted");
+        } else {
+            element.style.removeProperty("--minimap-content-shift");
+            element.classList.remove("minimap-content-shifted");
+        }
     }
 
     // Themes commonly scope line height to selectors the panel does not match,

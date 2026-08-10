@@ -17,33 +17,55 @@
 import type { EditorView } from "@codemirror/view";
 import { clamp } from "./utils";
 
-const ATX_HEADING = /^ {0,3}#{1,6}(\s|$)/;
+const ATX_HEADING = /^ {0,3}(#{1,6})(?:\s|$)/;
 const BLOCKQUOTE_PREFIX = /^ {0,3}> ?/;
 
+/** Heading source lines and their levels, in document order. */
+export interface HeadingIndex {
+    /** Source line numbers, 1-based. */
+    lines: number[];
+    /** Heading level 1-6, parallel to `lines`. */
+    levels: number[];
+}
+
 /**
- * Source line numbers (1-based) of every ATX heading that Obsidian renders as
- * an <hN>, in document order. Blockquoted headings are included because they
- * render as headings too; fenced code and frontmatter are excluded via
- * `protectedLines`.
+ * Every ATX heading that Obsidian renders as an <hN>, in document order.
+ * Blockquoted headings are included because they render as headings too; fenced
+ * code and frontmatter are excluded via `protectedLines`.
+ *
+ * The levels are what decides how far a folded heading reaches, so they are
+ * collected here rather than re-derived from the text at the fold site.
  */
+export function collectHeadings(
+    this: void,
+    lines: string[],
+    protectedLines: boolean[]
+): HeadingIndex {
+    const index: HeadingIndex = { lines: [], levels: [] };
+
+    for (let line = 0; line < lines.length; line++) {
+        if (protectedLines[line]) continue;
+
+        let text = lines[line];
+        while (BLOCKQUOTE_PREFIX.test(text)) {
+            text = text.replace(BLOCKQUOTE_PREFIX, "");
+        }
+        const match = text.match(ATX_HEADING);
+        if (!match) continue;
+        index.lines.push(line + 1);
+        index.levels.push(match[1].length);
+    }
+
+    return index;
+}
+
+/** Source line numbers (1-based) of every rendered heading, in document order. */
 export function collectHeadingLines(
     this: void,
     lines: string[],
     protectedLines: boolean[]
 ): number[] {
-    const headings: number[] = [];
-
-    for (let index = 0; index < lines.length; index++) {
-        if (protectedLines[index]) continue;
-
-        let text = lines[index];
-        while (BLOCKQUOTE_PREFIX.test(text)) {
-            text = text.replace(BLOCKQUOTE_PREFIX, "");
-        }
-        if (ATX_HEADING.test(text)) headings.push(index + 1);
-    }
-
-    return headings;
+    return collectHeadings(lines, protectedLines).lines;
 }
 
 /** A position that exists in both coordinate spaces. */
@@ -187,6 +209,7 @@ export class AnchorTracker {
     private anchors: HeadingAnchors | null = null;
     private content: HTMLElement | null = null;
     private headingLines: number[] = [];
+    private hiddenHeadings: ReadonlySet<number> = new Set();
     private scale = 1;
     /** Panel height the current pairing was measured against. */
     private contentHeight = 0;
@@ -209,10 +232,23 @@ export class AnchorTracker {
      * Pair each source heading with the rendered heading at the same ordinal.
      * A wrong pairing would be worse than no anchors at all, so any sign the
      * two lists disagree drops back to the global ratio.
+     *
+     * `hiddenHeadings` holds the ordinals the panel has folded away. They are
+     * dropped from the pairing rather than measured: a display:none heading
+     * reports a zero rect, which reads as a position above its predecessor and
+     * would fail the monotonic check, disabling anchoring for the whole note.
+     * Dropping them is also the right answer — the editor has collapsed those
+     * headings too, so the fold's opening and closing anchors bracket it.
      */
-    capture(content: HTMLElement | null, headingLines: number[], scale: number) {
+    capture(
+        content: HTMLElement | null,
+        headingLines: number[],
+        scale: number,
+        hiddenHeadings: ReadonlySet<number> = new Set()
+    ) {
         this.content = content;
         this.headingLines = headingLines;
+        this.hiddenHeadings = hiddenHeadings;
         this.scale = scale || 1;
         this.anchors = null;
         if (!content || headingLines.length === 0) return;
@@ -230,17 +266,22 @@ export class AnchorTracker {
         if (rendered.length !== headingLines.length) return;
 
         const contentTop = content.getBoundingClientRect().top;
+        const lines: number[] = [];
         const minimapY: number[] = [];
         let previous = -1;
-        for (const heading of rendered) {
+        for (let index = 0; index < rendered.length; index++) {
+            if (hiddenHeadings.has(index)) continue;
             const y =
-                (heading.getBoundingClientRect().top - contentTop) / this.scale;
+                (rendered[index].getBoundingClientRect().top - contentTop) /
+                this.scale;
             if (!Number.isFinite(y) || y < previous) return;
             previous = y;
+            lines.push(headingLines[index]);
             minimapY.push(y);
         }
+        if (lines.length === 0) return;
 
-        this.anchors = new HeadingAnchors(headingLines, minimapY);
+        this.anchors = new HeadingAnchors(lines, minimapY);
         this.contentHeight = content.scrollHeight;
     }
 
@@ -253,7 +294,12 @@ export class AnchorTracker {
     revalidate(contentHeight: number) {
         if (!this.anchors) return;
         if (contentHeight === this.contentHeight) return;
-        this.capture(this.content, this.headingLines, this.scale);
+        this.capture(
+            this.content,
+            this.headingLines,
+            this.scale,
+            this.hiddenHeadings
+        );
     }
 
     /**

@@ -1,4 +1,4 @@
-import { collectHeadingLines } from "./anchors";
+import { collectHeadings } from "./anchors";
 
 export interface BlankLineRun {
     markerClass: string;
@@ -11,6 +11,10 @@ export interface BlankLineRenderData {
     frontmatterLineCount: number;
     /** Source line numbers of headings, for anchor-based scroll mapping. */
     headingLines: number[];
+    /** Heading levels, parallel to `headingLines`, for resolving fold extents. */
+    headingLevels: number[];
+    /** Total source lines, which bounds a fold that reaches the end. */
+    lineCount: number;
 }
 
 type Fence = {
@@ -150,10 +154,13 @@ export function prepareBlankLineRuns(
         index = end;
     }
 
+    const headings = collectHeadings(lines, protectedLines);
     return {
         markdown: output.join(newline),
         runs,
         frontmatterLineCount: getFrontmatterLineCount(lines),
-        headingLines: collectHeadingLines(lines, protectedLines),
+        headingLines: headings.lines,
+        headingLevels: headings.levels,
+        lineCount: lines.length,
     };
 }

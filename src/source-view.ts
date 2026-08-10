@@ -1,6 +1,6 @@
 import type { EditorView } from "@codemirror/view";
 import { getFrontmatterLineCount, getProtectedLines } from "./blank-lines";
-import { collectHeadingLines } from "./anchors";
+import { collectHeadings } from "./anchors";
 
 /**
  * Source mode prints the file verbatim, so the minimap does too.
@@ -39,7 +39,7 @@ export function classifySourceLines(
     const lines = markdown.split(/\r?\n/);
     const protectedLines = getProtectedLines(lines);
     const frontmatterLines = getFrontmatterLineCount(lines);
-    const headings = new Set(collectHeadingLines(lines, protectedLines));
+    const headings = new Set(collectHeadings(lines, protectedLines).lines);
 
     return lines.map((text, index) => {
         const lineNumber = index + 1;
@@ -62,6 +62,8 @@ export interface SourceLineDom {
     elements: HTMLElement[];
     /** Source line numbers of the headings, for anchor pairing. */
     headingLines: number[];
+    /** Heading levels, parallel to `headingLines`, for resolving fold extents. */
+    headingLevels: number[];
 }
 
 export function buildSourceLineDom(
@@ -70,6 +72,7 @@ export function buildSourceLineDom(
 ): SourceLineDom {
     const lines = classifySourceLines(markdown);
     const headingLines: number[] = [];
+    const headingLevels: number[] = [];
     const elements: HTMLElement[] = [];
     const fragment = activeDocument.createDocumentFragment();
 
@@ -82,6 +85,7 @@ export function buildSourceLineDom(
                 `mod-h${line.level}`
             );
             headingLines.push(index + 1);
+            headingLevels.push(line.level);
         } else if (line.kind === "code") {
             element.classList.add("mod-code");
         } else if (line.kind === "frontmatter") {
@@ -94,7 +98,7 @@ export function buildSourceLineDom(
         fragment.appendChild(element);
     });
 
-    return { fragment, elements, headingLines };
+    return { fragment, elements, headingLines, headingLevels };
 }
 
 /**
@@ -122,7 +126,14 @@ export function applySourceLineHeights(
     for (let index = 0; index < elements.length; index++) {
         const lineNumber = index + 1;
         if (lineNumber > doc.lines) break;
-        const height = editorView.lineBlockAt(doc.line(lineNumber).from).height;
+        const block = editorView.lineBlockAt(doc.line(lineNumber).from);
+        // A fold merges its lines into a single block, and every line inside it
+        // reports that block's whole height. Giving each of them the full value
+        // made a folded section taller in the panel than it had been unfolded,
+        // so the height goes to the line the block starts on and the rest
+        // collapse — which is what the editor shows.
+        const first = doc.lineAt(block.from).number;
+        const height = lineNumber === first ? block.height : 0;
         elements[index].style.height = `${Math.max(0, height)}px`;
     }
 

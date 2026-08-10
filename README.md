@@ -26,6 +26,7 @@ pixels away.
 - 🖱️ **Click or drag** anywhere in the minimap to jump there
 - 🖲️ **Scroll wheel** over the minimap scrolls the note
 - 🎯 **Mode-aware** — Live Preview, Source and Reading each get a faithful map
+- 🪗 **Follows your folds** — collapsed sections and properties collapse too
 - 🌓 **Follows your theme**, including custom fonts, heading sizes and snippets
 - 🔁 **Per-note toggle** and refresh, from the note header or the command palette
 - 📏 **Resizes** with the pane
@@ -125,11 +126,23 @@ mapped height. The minimap matches the editor's box.
 are re-inserted as inert spacers sized from CodeMirror's line blocks, so
 deliberate whitespace survives.
 
+**Collapsed sections.** A folded section takes no room in the note, so drawing
+it would add height the note doesn't have and push everything below it out of
+step. The minimap reads Obsidian's own fold state and folds to match, in every
+mode — including Reading view, where the note's own sections are virtualized but
+the panel's are not. Collapsing the properties works the same way. Folds that
+don't hang off a heading, such as a list item, aren't mirrored in the rendered
+modes; Source mode takes every line's height from CodeMirror, so it follows all
+of them exactly.
+
 **The full scroll range.** Obsidian lets you scroll past the end of a note, and
-its own scrollbar covers that space. The minimap mirrors it with a matching
-spacer rather than leaving it out, so the marker reaches the end of its track
-exactly when the editor does and wheel distance keeps matching marker travel all
-the way down.
+its own scrollbar covers that space. The minimap mirrors it rather than leaving
+it out, so the marker reaches the end of its track exactly when the editor does
+and wheel distance keeps matching marker travel all the way down. That space is
+scaled by the same ratio the panel achieves on the note's content, so it isn't
+the one stretch of the panel drawn at a different scale from everything above
+it — which is what used to make the marker change size on the approach to the
+end of a long note.
 
 **Scroll mapping.** Scaling the note by a single ratio assumes the minimap grows
 at the same rate the note does, which it doesn't — small per-block differences
@@ -153,8 +166,13 @@ npm run build
 | `main.ts` | Plugin lifecycle, workspace events, commands |
 | `minimap.ts` | The minimap itself — rendering, measurement, scroll sync |
 | `anchors.ts` | Heading extraction and the piecewise scroll mapping |
-| `source-lines.ts` | Source-mode line classification |
+| `scroll-model.ts` | The scroll arithmetic, kept free of the DOM |
+| `document-metrics.ts` | Measuring the note's layout and mirroring it onto the panel |
+| `folds.ts` | Reading the note's fold state and folding the panel to match |
+| `frontmatter.ts` | Reproducing the properties widget at the height it occupies |
+| `source-view.ts` | Source-mode line classification and line heights |
 | `blank-lines.ts` | Blank-line runs, frontmatter and fence scanning |
+| `pointer.ts` | Click, drag and wheel handling |
 | `settings.ts` | Settings model and tab |
 | `utils.ts` | Small shared helpers |
 

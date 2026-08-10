@@ -77,6 +77,26 @@ export function measureFrontmatter(
     return { height, widget: null };
 }
 
+/**
+ * A copy of the note's properties widget, inert. Whatever state the widget is
+ * in — collapsed, expanded, mid-edit — the clone carries it, so the panel shows
+ * the note's properties rather than a reconstruction of them.
+ */
+export function cloneMetadataWidget(
+    this: void,
+    widget: HTMLElement
+): HTMLElement {
+    const clone = widget.cloneNode(true) as HTMLElement;
+    clone.removeAttribute("id");
+    clone.querySelectorAll("[contenteditable]").forEach((node) => {
+        node.removeAttribute("contenteditable");
+    });
+    clone.querySelectorAll("[tabindex]").forEach((node) => {
+        node.setAttribute("tabindex", "-1");
+    });
+    return clone;
+}
+
 export interface FrontmatterOptions {
     /** The rendered Markdown, before it is moved into the panel. */
     rendered: HTMLElement;
@@ -130,15 +150,7 @@ export function renderFrontmatter(
 
     if (measurement.widget) {
         yaml?.remove();
-        const clone = measurement.widget.cloneNode(true) as HTMLElement;
-        clone.removeAttribute("id");
-        clone.querySelectorAll("[contenteditable]").forEach((node) => {
-            node.removeAttribute("contenteditable");
-        });
-        clone.querySelectorAll("[tabindex]").forEach((node) => {
-            node.setAttribute("tabindex", "-1");
-        });
-        wrapper.appendChild(clone);
+        wrapper.appendChild(cloneMetadataWidget(measurement.widget));
     } else if (yaml) {
         yaml.style.removeProperty("display");
         wrapper.appendChild(yaml);

@@ -4,7 +4,17 @@ import { prepareBlankLineRuns } from "./blank-lines";
 import type { BlankLineRun } from "./blank-lines";
 import { AnchorTracker } from "./anchors";
 import { mirrorCodeMetrics, mirrorDocumentMetrics } from "./document-metrics";
-import { findInlineTitle, renderFrontmatter } from "./frontmatter";
+import {
+    applyFoldsToPanel,
+    readFoldHeads,
+    resolveFoldRanges,
+} from "./folds";
+import {
+    cloneMetadataWidget,
+    findInlineTitle,
+    findMetadataContainer,
+    renderFrontmatter,
+} from "./frontmatter";
 import { MinimapPointer } from "./pointer";
 import type { PointerHost } from "./pointer";
 import {
@@ -49,6 +59,16 @@ export class Minimap implements PointerHost {
     private readonly pointer = new MinimapPointer(this);
     /** Heading source lines from the last render, paired with the anchors. */
     private headingLines: number[] = [];
+    /** Heading levels from the last render, parallel to `headingLines`. */
+    private headingLevels: number[] = [];
+    /** Source line count from the last render, bounding a fold to the end. */
+    private lineCount = 0;
+    /** Heading ordinals the panel has folded away. */
+    private hiddenHeadings: ReadonlySet<number> = new Set();
+    /** Fold heads the panel is currently mirroring, for change detection. */
+    private foldSignature = "";
+    private foldObserver: MutationObserver | null = null;
+    private foldCheckTimer = 0;
     /** Whether a real code line has been measured for this view yet. */
     private codeMetricsMirrored = false;
     /** Source-mode line elements, index 0 being source line 1. */
@@ -78,6 +98,7 @@ export class Minimap implements PointerHost {
         this.sourceView = sourceView;
 
         this.setupElements();
+        this.observeFolds();
         this.updateSettings(settings);
         this.modeChange();
 
@@ -115,9 +136,114 @@ export class Minimap implements PointerHost {
         container.appendChild(this.hitbox);
     }
 
+    /**
+     * Folding fires no event a plugin can subscribe to, so the panel watches for
+     * the DOM churn a fold causes and re-reads Obsidian's own fold state when it
+     * settles. The read is compared against a signature before any work is done,
+     * which is what makes it safe to hang off a noisy observer: on a 6,000-line
+     * note the read costs about 1.5ms, and only a genuine change gets past it.
+     *
+     * Neither root contains the panel, so the panel's own updates cannot feed
+     * back into this.
+     */
+    private observeFolds() {
+        this.foldObserver = new MutationObserver(this.onPossibleFoldChange);
+        const options: MutationObserverInit = {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            // Collapsing a heading or the properties widget toggles a class;
+            // folding in the editor swaps the lines out. Watching both covers
+            // every mode without needing to know which one is showing.
+            attributeFilter: ["class"],
+        };
+        // The whole source view, not just the editor's content: the properties
+        // widget sits outside it, so collapsing the properties went unnoticed.
+        this.foldObserver.observe(this.sourceView, options);
+        const readingView = this.element.querySelector<HTMLElement>(
+            ".markdown-reading-view"
+        );
+        if (readingView) this.foldObserver.observe(readingView, options);
+    }
+
+    private onPossibleFoldChange = () => {
+        window.clearTimeout(this.foldCheckTimer);
+        this.foldCheckTimer = window.setTimeout(this.checkFolds, 200);
+    };
+
+    private checkFolds = () => {
+        if (!this.content) return;
+        // Collapsing the properties widget changes its height without changing
+        // anything the Markdown renderer produced, so re-pin rather than
+        // re-render the whole note. Checked before the signature, since the
+        // widget can also be resized by editing a property.
+        const resized = this.syncFrontmatterHeight();
+        const heads = readFoldHeads(this.view);
+        const signature = heads.join(",");
+        if (signature === this.foldSignature) {
+            if (resized) void this.onResize();
+            return;
+        }
+        this.foldSignature = signature;
+        this.applyFolds(heads);
+        void this.onResize();
+    };
+
+    /**
+     * Source mode needs none of this: every line takes its height straight from
+     * CodeMirror, which has already collapsed the folded ones.
+     */
+    private applyFolds(foldHeads: number[]) {
+        if (this.isRawSourceMode()) {
+            this.hiddenHeadings = new Set();
+            return;
+        }
+        const ranges = resolveFoldRanges(
+            foldHeads,
+            this.headingLines,
+            this.headingLevels,
+            this.lineCount
+        );
+        this.hiddenHeadings = applyFoldsToPanel(
+            this.content,
+            this.headingLines,
+            ranges
+        );
+    }
+
+    /**
+     * Re-measure the note's properties and resize the panel's copy to match.
+     * The clone is replaced as well as re-sized so a collapsed widget reads as
+     * collapsed rather than as its own top few rows behind a clip.
+     */
+    private syncFrontmatterHeight(): boolean {
+        const wrapper = this.content?.querySelector<HTMLElement>(
+            ".markdown-minimap-properties"
+        );
+        if (!wrapper) return false;
+        const widget = findMetadataContainer(
+            this.element,
+            this.isReadModeActive()
+        );
+        if (!widget || widget.offsetHeight <= 0) return false;
+
+        const height = `${widget.offsetHeight}px`;
+        if (wrapper.style.height === height) return false;
+
+        wrapper.style.height = height;
+        const existing = wrapper.firstElementChild;
+        if (existing?.classList.contains("metadata-container")) {
+            existing.replaceWith(cloneMetadataWidget(widget));
+        }
+        return true;
+    }
+
     destroy() {
         this.renderVersion++; // invalidate any in-flight render
         window.clearTimeout(this.trailingSyncTimer);
+        window.clearTimeout(this.foldCheckTimer);
+        this.foldObserver?.disconnect();
+        this.foldObserver = null;
         this.scroller?.removeEventListener("scroll", this.onScroll);
         this.pointer.detach(this.hitbox);
 
@@ -382,6 +508,8 @@ export class Minimap implements PointerHost {
         this.refreshSourceLineHeights();
 
         this.headingLines = dom.headingLines;
+        this.headingLevels = dom.headingLevels;
+        this.lineCount = dom.elements.length;
         this.afterRender();
     }
 
@@ -459,6 +587,8 @@ export class Minimap implements PointerHost {
         }
 
         this.headingLines = data.headingLines;
+        this.headingLevels = data.headingLevels;
+        this.lineCount = data.lineCount;
         this.afterRender();
     }
 
@@ -477,7 +607,18 @@ export class Minimap implements PointerHost {
 
     private afterRender() {
         this.syncDocumentMetrics();
-        this.anchors.capture(this.content, this.headingLines, this.scale);
+        // A re-render rebuilds the panel from the full note, so the note's
+        // collapsed sections have to be folded back out of it before anything
+        // measures the result.
+        const foldHeads = readFoldHeads(this.view);
+        this.foldSignature = foldHeads.join(",");
+        this.applyFolds(foldHeads);
+        this.anchors.capture(
+            this.content,
+            this.headingLines,
+            this.scale,
+            this.hiddenHeadings
+        );
         void this.onResize();
     }
 
@@ -509,7 +650,12 @@ export class Minimap implements PointerHost {
         if (this.isRawSourceMode()) this.refreshSourceLineHeights();
         // Layout may have shifted every heading, so re-measure the anchors
         // before they are used to place the slider.
-        this.anchors.capture(this.content, this.headingLines, this.scale);
+        this.anchors.capture(
+            this.content,
+            this.headingLines,
+            this.scale,
+            this.hiddenHeadings
+        );
         // Sync now and once more after CodeMirror's height estimate settles.
         this.onScroll();
     }

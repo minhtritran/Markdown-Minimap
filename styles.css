@@ -22,11 +22,7 @@
     height: auto;
     overflow: visible;
     padding: var(--minimap-doc-padding-top, 0px) 0
-        calc(
-            var(--minimap-doc-padding-bottom, 0px) +
-                var(--minimap-scroll-past-end, 0px)
-        )
-        0;
+        var(--minimap-doc-trailing, 0px) 0;
     pointer-events: none;
     user-select: none;
     scale: var(--scale);
@@ -61,6 +57,13 @@
     padding-right: var(--minimap-code-padding-right, 0px);
     line-height: var(--minimap-code-line-height, inherit);
     font-size: var(--minimap-code-font-size, inherit);
+}
+
+/* A section the note has collapsed. Removed from flow rather than clipped, so
+   the panel loses exactly the height the note does and everything below it
+   lines up again. */
+.minimap-content .minimap-folded {
+    display: none;
 }
 
 .minimap-content .markdown-minimap-blank-run {
