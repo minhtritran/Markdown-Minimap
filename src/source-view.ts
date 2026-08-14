@@ -56,6 +56,109 @@ export function classifySourceLines(
     });
 }
 
+/**
+ * Source mode is not plain text in the editor: CodeMirror still highlights it,
+ * so links, tags, code and headings all carry their theme colour. At minimap
+ * scale the words are unreadable and that colour is the only thing left telling
+ * one part of the note from another, which is why reproducing it matters more
+ * here than at full size.
+ *
+ * Matched in one pass so earlier alternatives win: a `**bold**` run inside a
+ * code span stays code, as it does in the editor.
+ */
+const INLINE_TOKEN = new RegExp(
+    [
+        "(?<code>`[^`\\n]+`)",
+        "(?<embed>!?\\[\\[[^\\]\\n]*\\]\\])",
+        "(?<link>!?\\[[^\\]\\n]*\\]\\([^)\\n]*\\))",
+        "(?<url>https?:\\/\\/[^\\s)]+)",
+        "(?<strong>\\*\\*[^\\n]+?\\*\\*|__[^\\n]+?__)",
+        "(?<em>\\*[^*\\n]+?\\*|_[^_\\n]+?_)",
+        "(?<highlight>==[^\\n]+?==)",
+        "(?<strike>~~[^\\n]+?~~)",
+        "(?<tag>(?<=^|\\s)#[\\p{L}\\p{N}/_-]+)",
+    ].join("|"),
+    "gu"
+);
+
+const TOKEN_CLASS: Record<string, string> = {
+    code: "minimap-source-code-span",
+    embed: "minimap-source-link",
+    link: "minimap-source-link",
+    url: "minimap-source-link",
+    strong: "minimap-source-strong",
+    em: "minimap-source-em",
+    highlight: "minimap-source-highlight",
+    strike: "minimap-source-strike",
+    tag: "minimap-source-tag",
+};
+
+const QUOTE_LINE = /^ {0,3}(?:> ?)+/;
+const LIST_MARKER = /^(\s*)([-*+]|\d+[.)])(\s+(?:\[[ xX/-]\]\s+)?)/;
+
+function appendToken(
+    this: void,
+    parent: HTMLElement,
+    text: string,
+    cls?: string
+) {
+    if (!text) return;
+    if (!cls) {
+        parent.appendChild(activeDocument.createTextNode(text));
+        return;
+    }
+    const span = activeDocument.createElement("span");
+    span.className = cls;
+    span.textContent = text;
+    parent.appendChild(span);
+}
+
+/**
+ * Fill a line element with the source text, wrapping the parts the editor
+ * colours in spans. Falls back to a single text node when there is nothing to
+ * mark, which is most lines.
+ */
+function fillLine(this: void, element: HTMLElement, text: string) {
+    if (text.length === 0) {
+        // An empty div collapses to nothing; a zero-width space keeps the line
+        // box so blank lines occupy their line, as they do in Source.
+        element.textContent = "​";
+        return;
+    }
+
+    let rest = text;
+    const quote = rest.match(QUOTE_LINE);
+    if (quote) {
+        element.classList.add("mod-quote");
+        appendToken(element, quote[0], "minimap-source-marker");
+        rest = rest.slice(quote[0].length);
+    }
+    const marker = rest.match(LIST_MARKER);
+    if (marker) {
+        appendToken(element, marker[1]);
+        appendToken(
+            element,
+            marker[2] + marker[3],
+            "minimap-source-marker"
+        );
+        rest = rest.slice(marker[0].length);
+    }
+
+    INLINE_TOKEN.lastIndex = 0;
+    let index = 0;
+    let match: RegExpExecArray | null;
+    while ((match = INLINE_TOKEN.exec(rest)) !== null) {
+        appendToken(element, rest.slice(index, match.index));
+        const groups = match.groups ?? {};
+        const name = Object.keys(groups).find(
+            (key) => groups[key] !== undefined
+        );
+        appendToken(element, match[0], name ? TOKEN_CLASS[name] : undefined);
+        index = match.index + match[0].length;
+    }
+    appendToken(element, rest.slice(index));
+}
+
 export interface SourceLineDom {
     fragment: DocumentFragment;
     /** One element per source line, index 0 being line 1. */
@@ -91,9 +194,14 @@ export function buildSourceLineDom(
         } else if (line.kind === "frontmatter") {
             element.classList.add("mod-frontmatter");
         }
-        // An empty div collapses to nothing; a zero-width space keeps the line
-        // box so blank lines occupy their line, as they do in Source.
-        element.textContent = line.text.length > 0 ? line.text : "\u200B";
+        // Code and frontmatter are literal in the editor too, so nothing inside
+        // them is markup to colour.
+        if (line.kind === "code" || line.kind === "frontmatter") {
+            element.textContent =
+                line.text.length > 0 ? line.text : "\u200B";
+        } else {
+            fillLine(element, line.text);
+        }
         elements.push(element);
         fragment.appendChild(element);
     });

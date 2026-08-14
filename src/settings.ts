@@ -103,6 +103,21 @@ export class MinimapSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
+        // Kept out of the settings object on purpose: that file syncs with the
+        // vault, and this answer is meant to differ from one device to the next.
+        new Setting(containerEl)
+            .setName("Disable on this device")
+            .setDesc(
+                "Hide the minimap on this device only. Stored locally, so it does not sync to your other devices"
+            )
+            .addToggle((toggle) => {
+                toggle
+                    .setValue(this.plugin.deviceDisabled)
+                    .onChange((value) => {
+                        this.plugin.setDeviceDisabled(value);
+                    });
+            });
+
         this.addToggle(
             "Enable by default",
             "Already opened notes will not be affected by changing this",

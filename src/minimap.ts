@@ -263,6 +263,8 @@ export class Minimap implements PointerHost {
         this.renderComponent = null;
         this.container?.remove();
         this.element.style.removeProperty("--minimap-content-shift");
+        this.element.style.removeProperty("--minimap-sizer-margin-left");
+        this.element.style.removeProperty("--minimap-sizer-margin-right");
         this.element.classList.remove("minimap-content-shifted");
 
         this.container = null;

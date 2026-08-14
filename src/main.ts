@@ -8,6 +8,13 @@ import {
 import type { MarkdownMinimapSettings } from "./settings";
 import { sleep, throttle } from "./utils";
 
+/**
+ * Where the per-device switch is kept. Obsidian scopes local storage to the
+ * vault and never syncs it, which is the whole point: `data.json` travels with
+ * the vault, so a setting stored there cannot mean "not on this phone".
+ */
+const DEVICE_DISABLED_KEY = "markdown-minimap:disabled";
+
 export default class NoteMinimap extends Plugin {
     activeNoteView: MarkdownView | null = null;
     minimapInstances = new Map<HTMLElement, Minimap>(); // contentEl: minimap
@@ -15,6 +22,8 @@ export default class NoteMinimap extends Plugin {
     modeObserver!: MutationObserver;
     debouncedUpdateMinimap: ReturnType<typeof debounce> | undefined;
     settings!: MarkdownMinimapSettings;
+    /** Off on this device only; see DEVICE_DISABLED_KEY. */
+    deviceDisabled = false;
 
     async onload() {
         // Handle resize
@@ -132,12 +141,17 @@ export default class NoteMinimap extends Plugin {
         );
 
         await this.loadSettings();
+        // Obsidian has stored local storage values as JSON and as raw strings
+        // across versions, so accept either shape.
+        const stored: unknown = this.app.loadLocalStorage(DEVICE_DISABLED_KEY);
+        this.deviceDisabled = stored === true || stored === "true";
         this.addSettingTab(new MinimapSettingTab(this));
 
         this.addCommand({
             id: "toggle-minimap",
             name: "Toggle minimap for current note",
             checkCallback: (checking) => {
+                if (this.deviceDisabled) return false;
                 const view =
                     this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (!view) return false;
@@ -149,6 +163,7 @@ export default class NoteMinimap extends Plugin {
             id: "refresh-minimap",
             name: "Refresh minimap for current note",
             checkCallback: (checking) => {
+                if (this.deviceDisabled) return false;
                 const view =
                     this.app.workspace.getActiveViewOfType(MarkdownView);
                 if (!view) return false;
@@ -196,6 +211,37 @@ export default class NoteMinimap extends Plugin {
         );
     }
 
+    /**
+     * Turn the plugin's UI off for this device without disabling the plugin,
+     * which would take it off every device the vault syncs to.
+     */
+    setDeviceDisabled(disabled: boolean) {
+        if (this.deviceDisabled === disabled) return;
+        this.deviceDisabled = disabled;
+        this.app.saveLocalStorage(
+            DEVICE_DISABLED_KEY,
+            disabled ? "true" : null
+        );
+        if (disabled) {
+            for (const element of [...this.minimapInstances.keys()]) {
+                this.destroyMinimapForElement(element);
+            }
+            this.removeActionButtons();
+        } else {
+            this.injectMinimapIntoAllNotes();
+        }
+    }
+
+    removeActionButtons() {
+        for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
+            leaf.view.containerEl
+                .querySelectorAll(
+                    ".minimap-toggle-button, .minimap-refresh-button"
+                )
+                .forEach((button) => button.remove());
+        }
+    }
+
     async resetSettings() {
         this.settings = getDefaultSettings();
         await this.saveSettings();
@@ -219,6 +265,7 @@ export default class NoteMinimap extends Plugin {
     }
 
     async updateViewMinimap(view: MarkdownView) {
+        if (this.deviceDisabled) return;
         // Wait for Obsidian to finish applying leaf/view changes before
         // reading editor DOM state. No equivalent settled event exists.
         await sleep(100);
@@ -264,6 +311,7 @@ export default class NoteMinimap extends Plugin {
     }
 
     addActionButtonsToView(view: MarkdownView) {
+        if (this.deviceDisabled) return;
         // Avoid adding twice
         if (view.containerEl.querySelector(".minimap-toggle-button")) return;
 

@@ -151,31 +151,74 @@
     font-size: var(--h1-size);
     line-height: var(--h1-line-height, 1.2);
     font-weight: var(--h1-weight, 700);
+    color: var(--h1-color, inherit);
 }
 .minimap-content-source .minimap-source-line.mod-h2 {
     font-size: var(--h2-size);
     line-height: var(--h2-line-height, var(--h1-line-height, 1.2));
     font-weight: var(--h2-weight, 600);
+    color: var(--h2-color, inherit);
 }
 .minimap-content-source .minimap-source-line.mod-h3 {
     font-size: var(--h3-size);
     line-height: var(--h3-line-height, var(--h1-line-height, 1.2));
     font-weight: var(--h3-weight, 600);
+    color: var(--h3-color, inherit);
 }
 .minimap-content-source .minimap-source-line.mod-h4 {
     font-size: var(--h4-size);
     line-height: var(--h4-line-height, var(--h1-line-height, 1.2));
     font-weight: var(--h4-weight, 600);
+    color: var(--h4-color, inherit);
 }
 .minimap-content-source .minimap-source-line.mod-h5 {
     font-size: var(--h5-size);
     line-height: var(--h5-line-height, var(--h1-line-height, 1.2));
     font-weight: var(--h5-weight, 600);
+    color: var(--h5-color, inherit);
 }
 .minimap-content-source .minimap-source-line.mod-h6 {
     font-size: var(--h6-size);
     line-height: var(--h6-line-height, var(--h1-line-height, 1.2));
     font-weight: var(--h6-weight, 600);
+    color: var(--h6-color, inherit);
+}
+
+/* Source mode is highlighted in the editor too, so the panel keeps the same
+   colours. Scaled to a tenth, colour is most of what is left to tell a link
+   from a tag from a quote — the words themselves are long past reading.
+   Nothing here changes a font size, so no line can outgrow the height copied
+   from CodeMirror. */
+.minimap-content-source .minimap-source-line.mod-quote {
+    color: var(--text-muted);
+}
+.minimap-content-source .minimap-source-marker {
+    color: var(--list-marker-color, var(--text-faint));
+}
+.minimap-content-source .minimap-source-link {
+    color: var(--link-color, var(--text-accent));
+}
+.minimap-content-source .minimap-source-tag {
+    color: var(--tag-color, var(--text-accent));
+}
+.minimap-content-source .minimap-source-code-span {
+    color: var(--code-normal, var(--text-normal));
+    background-color: var(--code-background);
+}
+.minimap-content-source .minimap-source-strong {
+    font-weight: var(--bold-weight, 700);
+    color: var(--bold-color, inherit);
+}
+.minimap-content-source .minimap-source-em {
+    font-style: italic;
+    color: var(--italic-color, inherit);
+}
+.minimap-content-source .minimap-source-highlight {
+    background-color: var(--text-highlight-bg);
+}
+.minimap-content-source .minimap-source-strike {
+    color: var(--text-muted);
+    text-decoration: line-through;
 }
 
 .minimap-disabled .minimap-container {
@@ -183,12 +226,19 @@
 }
 
 /* Optional breathing room between the note's text and the minimap.
-   Suggested by @2590812378 in issue #3. */
+   Suggested by @2590812378 in issue #3.
+
+   Margins, not a transform: a transform makes the sizer the containing block
+   for every absolutely positioned descendant, and Obsidian's find-in-note
+   overlay positions its match boxes in coordinates measured against the
+   scroller. The two margins are equal and opposite, so the box moves without
+   its width changing and nothing rewraps. */
 .minimap-content-shifted:not(.minimap-disabled)
     .markdown-source-view.mod-cm6
     .cm-sizer,
 .minimap-content-shifted:not(.minimap-disabled)
     .markdown-reading-view
     .markdown-preview-sizer {
-    transform: translateX(calc(-1 * var(--minimap-content-shift, 0px)));
+    margin-left: var(--minimap-sizer-margin-left, auto);
+    margin-right: var(--minimap-sizer-margin-right, auto);
 }

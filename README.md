@@ -29,6 +29,7 @@ pixels away.
 - 🪗 **Follows your folds** — collapsed sections and properties collapse too
 - 🌓 **Follows your theme**, including custom fonts, heading sizes and snippets
 - 🔁 **Per-note toggle** and refresh, from the note header or the command palette
+- 📱 **Per-device switch** — turn it off on your phone without touching your desktop
 - 📏 **Resizes** with the pane
 
 ## 📦 Installation
@@ -62,6 +63,7 @@ dragging it.
 
 | Setting | What it does |
 | --- | --- |
+| Disable on this device | Hides the minimap on this device only. Stored outside the synced settings file, so your phone and your desktop can disagree |
 | Enable by default | Whether new notes open with the minimap shown |
 | Scale | Size of the minimap, 0.05–0.3 of actual size |
 | Opacity | Background opacity of the minimap panel |
@@ -109,7 +111,18 @@ the pane's full width.
 **Source mode shows source.** With Live Preview off, Obsidian prints the file
 verbatim. The minimap does the same — one element per source line, taking each
 line's height from CodeMirror itself, rather than rendering Markdown the note
-isn't showing. Line for line, this mode is exact.
+isn't showing. Line for line, this mode is exact. Source mode is still
+highlighted in the editor, so the panel keeps those colours too: headings, links,
+tags, quotes, code and emphasis all read as themselves. At a tenth of full size
+the colour is most of what is left to navigate by.
+
+**Making room without a transform.** The text is moved clear of the minimap with
+margins rather than a `translateX`. A transform makes the note's sizer the
+containing block for everything absolutely positioned inside it, and Obsidian's
+find-in-note overlay positions its match boxes in coordinates measured against
+the scroller — so in Reading view the highlights landed a margin's width away
+from the words they were marking. Two equal and opposite margins move the same
+box the same distance, leave its width alone, and claim nothing.
 
 **Properties.** Obsidian's Markdown renderer emits frontmatter as a hidden block
 and never builds the properties widget, so properties would take up space in the
@@ -170,7 +183,7 @@ npm run build
 | `document-metrics.ts` | Measuring the note's layout and mirroring it onto the panel |
 | `folds.ts` | Reading the note's fold state and folding the panel to match |
 | `frontmatter.ts` | Reproducing the properties widget at the height it occupies |
-| `source-view.ts` | Source-mode line classification and line heights |
+| `source-view.ts` | Source-mode line classification, highlighting and line heights |
 | `blank-lines.ts` | Blank-line runs, frontmatter and fence scanning |
 | `pointer.ts` | Click, drag and wheel handling |
 | `settings.ts` | Settings model and tab |

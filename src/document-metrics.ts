@@ -170,6 +170,71 @@ function reserveShift(
 }
 
 /**
+ * The margin the note's sizer centres itself with when left alone: half the
+ * room left over once its own width is taken out of the space inside the
+ * scroller's padding.
+ *
+ * Read from the sizer's own box rather than from the text width, so a line's
+ * own inset does not creep into it. Stable while the shift is applied, because
+ * the two margins written below are equal and opposite and therefore leave the
+ * sizer's width — and so this number — exactly where they found it.
+ */
+function baseSizerMargin(
+    this: void,
+    scroller: HTMLElement | null,
+    sizer: HTMLElement | null
+): number {
+    if (!scroller || !sizer) return 0;
+    const style = computedStyle(scroller);
+    const available =
+        scroller.clientWidth -
+        pixels(style?.paddingLeft) -
+        pixels(style?.paddingRight);
+    const width = sizer.getBoundingClientRect().width;
+    if (available <= 0 || width <= 0) return 0;
+    return Math.max(0, (available - width) / 2);
+}
+
+/**
+ * Move the note's text clear of the minimap, by margin rather than by
+ * transform.
+ *
+ * A transform on the sizer makes it the containing block for everything
+ * absolutely positioned inside it, and Obsidian's find-in-note overlay places
+ * its match boxes in coordinates measured against the scroller. In Reading view
+ * that put every highlight a centring margin away from the text it was marking.
+ * Equal and opposite margins move the same box the same distance without
+ * claiming its descendants' coordinate space, and leave the sizer's width
+ * untouched, so nothing rewraps either.
+ */
+function applyContentShift(
+    this: void,
+    element: HTMLElement,
+    scroller: HTMLElement | null,
+    sizer: HTMLElement | null,
+    shift: number
+): void {
+    if (shift <= 0) {
+        element.style.removeProperty("--minimap-content-shift");
+        element.style.removeProperty("--minimap-sizer-margin-left");
+        element.style.removeProperty("--minimap-sizer-margin-right");
+        element.classList.remove("minimap-content-shifted");
+        return;
+    }
+    const base = baseSizerMargin(scroller, sizer);
+    element.style.setProperty("--minimap-content-shift", `${shift}px`);
+    element.style.setProperty(
+        "--minimap-sizer-margin-left",
+        `${base - shift}px`
+    );
+    element.style.setProperty(
+        "--minimap-sizer-margin-right",
+        `${base + shift}px`
+    );
+    element.classList.add("minimap-content-shifted");
+}
+
+/**
  * The panel's counterpart to the contentless space below the note's last line —
  * the file margin plus the room Obsidian leaves for scrolling past the end.
  *
@@ -257,13 +322,7 @@ export function mirrorDocumentMetrics(
         const shift = options.reserveSpace
             ? reserveShift(scroller, textWidth, options.stripLeft)
             : 0;
-        if (shift > 0) {
-            element.style.setProperty("--minimap-content-shift", `${shift}px`);
-            element.classList.add("minimap-content-shifted");
-        } else {
-            element.style.removeProperty("--minimap-content-shift");
-            element.classList.remove("minimap-content-shifted");
-        }
+        applyContentShift(element, scroller, sizer, shift);
     }
 
     // Themes commonly scope line height to selectors the panel does not match,
