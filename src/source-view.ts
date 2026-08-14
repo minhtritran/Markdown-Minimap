@@ -65,6 +65,12 @@ export function classifySourceLines(
  *
  * Matched in one pass so earlier alternatives win: a `**bold**` run inside a
  * code span stays code, as it does in the editor.
+ *
+ * No lookbehind anywhere in here. iOS did not support them until 16.4, and this
+ * is built once at module scope, so a lookbehind would not merely fail to match
+ * on an older iPhone — it would throw while the module was still loading and
+ * take the whole plugin down with it. A tag therefore swallows the whitespace
+ * in front of it and `fillLine` hands that character back.
  */
 const INLINE_TOKEN = new RegExp(
     [
@@ -76,7 +82,7 @@ const INLINE_TOKEN = new RegExp(
         "(?<em>\\*[^*\\n]+?\\*|_[^_\\n]+?_)",
         "(?<highlight>==[^\\n]+?==)",
         "(?<strike>~~[^\\n]+?~~)",
-        "(?<tag>(?<=^|\\s)#[\\p{L}\\p{N}/_-]+)",
+        "(?<tag>(?:^|\\s)#[\\p{L}\\p{N}/_-]+)",
     ].join("|"),
     "gu"
 );
@@ -153,7 +159,18 @@ function fillLine(this: void, element: HTMLElement, text: string) {
         const name = Object.keys(groups).find(
             (key) => groups[key] !== undefined
         );
-        appendToken(element, match[0], name ? TOKEN_CLASS[name] : undefined);
+        // The tag alternative matches the separator in front of the hash to
+        // stand in for the lookbehind it cannot use; that character belongs to
+        // the line, not to the tag.
+        let token = match[0];
+        if (name === "tag") {
+            const lead = /^\s/.exec(token)?.[0];
+            if (lead) {
+                appendToken(element, lead);
+                token = token.slice(lead.length);
+            }
+        }
+        appendToken(element, token, name ? TOKEN_CLASS[name] : undefined);
         index = match.index + match[0].length;
     }
     appendToken(element, rest.slice(index));

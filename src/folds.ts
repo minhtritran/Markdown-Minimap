@@ -23,8 +23,10 @@ export interface FoldRange {
 }
 
 /** Obsidian's fold state. Undocumented, so every access is defensive. */
+type FoldInfo = { folds?: { from?: number; to?: number }[] } | null;
+
 interface FoldCapableMode {
-    getFoldInfo?: () => { folds?: { from?: number; to?: number }[] } | null;
+    getFoldInfo?: () => FoldInfo;
 }
 
 /**
@@ -36,7 +38,9 @@ interface FoldCapableMode {
  */
 export function readFoldHeads(this: void, view: MarkdownView): number[] {
     const mode = view.currentMode as unknown as FoldCapableMode | null;
-    let info;
+    // Annotated rather than left to evolve: an unannotated `let` is `any` until
+    // it is assigned, which makes everything read out of it `any` as well.
+    let info: FoldInfo | undefined;
     try {
         info = mode?.getFoldInfo?.();
     } catch {
