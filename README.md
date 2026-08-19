@@ -26,6 +26,7 @@ pixels away.
 - 🖱️ **Click or drag** anywhere in the minimap to jump there
 - 🖲️ **Scroll wheel** over the minimap scrolls the note
 - 🎯 **Mode-aware** — Live Preview, Source and Reading each get a faithful map
+- 🎨 **Code blocks in colour**, highlighted by language in every mode
 - 🪗 **Follows your folds** — collapsed sections and properties collapse too
 - 🌓 **Follows your theme**, including custom fonts, heading sizes and snippets
 - 🔁 **Per-note toggle** and refresh, from the note header or the command palette
@@ -116,6 +117,12 @@ highlighted in the editor, so the panel keeps those colours too: headings, links
 tags, quotes, code and emphasis all read as themselves. At a tenth of full size
 the colour is most of what is left to navigate by.
 
+**Code blocks are highlighted by language.** Reading view colours code by running
+it through Prism, so the panel runs the same tokenizer over fenced blocks and
+frontmatter and emits the same classes — meaning Source mode and Reading view
+show a block in exactly the same colours, from your theme's own palette. A fence
+with no language, or one Prism has no grammar for, stays plain text as before.
+
 **Making room without a transform.** The text is moved clear of the minimap with
 margins rather than a `translateX`. A transform makes the note's sizer the
 containing block for everything absolutely positioned inside it, and Obsidian's
@@ -184,6 +191,7 @@ npm run build
 | `folds.ts` | Reading the note's fold state and folding the panel to match |
 | `frontmatter.ts` | Reproducing the properties widget at the height it occupies |
 | `source-view.ts` | Source-mode line classification, highlighting and line heights |
+| `prism.ts` | Syntax highlighting for fenced code, via Obsidian's own Prism |
 | `blank-lines.ts` | Blank-line runs, frontmatter and fence scanning |
 | `pointer.ts` | Click, drag and wheel handling |
 | `settings.ts` | Settings model and tab |

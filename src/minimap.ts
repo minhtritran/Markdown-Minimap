@@ -21,6 +21,7 @@ import {
     applySourceLineHeights,
     buildSourceLineDom,
 } from "./source-view";
+import { isPrismReady, warmPrism } from "./prism";
 import {
     computeScrollMetrics,
     resolveDocumentHeights,
@@ -525,6 +526,18 @@ export class Minimap implements PointerHost {
         this.headingLevels = dom.headingLevels;
         this.lineCount = dom.elements.length;
         this.afterRender();
+
+        // Obsidian only loads Prism when it first renders a code block, so a
+        // session spent in Source mode may not have it yet and the code above
+        // will have drawn the note's code flat. Fetch it and draw once more.
+        // The re-render finds Prism loaded, so this cannot repeat.
+        if (dom.prismPending) {
+            void warmPrism(this.plugin.app).then(() => {
+                if (!this.content || !isPrismReady()) return;
+                if (!this.isRawSourceMode()) return;
+                this.renderSourceText();
+            });
+        }
     }
 
     private refreshSourceLineHeights() {

@@ -1,6 +1,11 @@
 import type { EditorView } from "@codemirror/view";
-import { getFrontmatterLineCount, getProtectedLines } from "./blank-lines";
+import {
+    getFencedCodeBlocks,
+    getFrontmatterLineCount,
+    getProtectedLines,
+} from "./blank-lines";
 import { collectHeadings } from "./anchors";
+import { highlightCode, isPrismReady, type CodeRun } from "./prism";
 
 /**
  * Source mode prints the file verbatim, so the minimap does too.
@@ -176,6 +181,68 @@ function fillLine(this: void, element: HTMLElement, text: string) {
     appendToken(element, rest.slice(index));
 }
 
+/** Highlighted code, keyed by zero-based source line index. */
+interface CodeHighlights {
+    lines: Map<number, CodeRun[]>;
+    /**
+     * True when something here could have been highlighted but Prism was not
+     * loaded. The caller loads it and renders again.
+     */
+    pending: boolean;
+}
+
+/**
+ * Highlight the note's fenced code blocks and its frontmatter, both of which
+ * the editor colours in Source mode and the panel has until now drawn flat.
+ *
+ * Every step degrades to no entry for the line, which renders as the plain
+ * text it always did. A block whose tokenized line count disagrees with its
+ * source line count is dropped whole rather than applied at a one-line offset:
+ * the panel's whole job is to line up with the note.
+ */
+function collectCodeHighlights(this: void, lines: string[]): CodeHighlights {
+    const highlights: CodeHighlights = { lines: new Map(), pending: false };
+    const ready = isPrismReady();
+
+    const apply = (first: number, last: number, language: string) => {
+        if (last < first || !language) return;
+        if (!ready) {
+            highlights.pending = true;
+            return;
+        }
+        const block = lines.slice(first, last + 1);
+        const runs = highlightCode(block.join("\n"), language);
+        if (!runs || runs.length !== block.length) return;
+        runs.forEach((run, offset) => highlights.lines.set(first + offset, run));
+    };
+
+    for (const block of getFencedCodeBlocks(lines)) {
+        // The fences themselves are punctuation the code does not contain.
+        apply(
+            block.open + 1,
+            Math.min(block.close, lines.length) - 1,
+            block.language
+        );
+    }
+
+    // Frontmatter is YAML between two `---` delimiters, which are no more part
+    // of the document than a fence is part of its code.
+    const frontmatter = getFrontmatterLineCount(lines);
+    if (frontmatter > 0) apply(1, frontmatter - 2, "yaml");
+
+    return highlights;
+}
+
+function fillCodeLine(this: void, element: HTMLElement, runs: CodeRun[]) {
+    if (runs.length === 0) {
+        element.textContent = "​";
+        return;
+    }
+    for (const run of runs) {
+        appendToken(element, run.text, run.className ?? undefined);
+    }
+}
+
 export interface SourceLineDom {
     fragment: DocumentFragment;
     /** One element per source line, index 0 being line 1. */
@@ -184,6 +251,11 @@ export interface SourceLineDom {
     headingLines: number[];
     /** Heading levels, parallel to `headingLines`, for resolving fold extents. */
     headingLevels: number[];
+    /**
+     * True when code or frontmatter went out flat only because Prism had not
+     * loaded yet, so the caller knows a second render is worth it.
+     */
+    prismPending: boolean;
 }
 
 export function buildSourceLineDom(
@@ -191,6 +263,7 @@ export function buildSourceLineDom(
     markdown: string
 ): SourceLineDom {
     const lines = classifySourceLines(markdown);
+    const highlights = collectCodeHighlights(markdown.split(/\r?\n/));
     const headingLines: number[] = [];
     const headingLevels: number[] = [];
     const elements: HTMLElement[] = [];
@@ -211,11 +284,17 @@ export function buildSourceLineDom(
         } else if (line.kind === "frontmatter") {
             element.classList.add("mod-frontmatter");
         }
-        // Code and frontmatter are literal in the editor too, so nothing inside
-        // them is markup to colour.
+        // Code and frontmatter carry no Markdown to colour \u2014 but the editor
+        // still highlights what is inside them, by language, so the panel does
+        // the same wherever Prism can tokenize it.
         if (line.kind === "code" || line.kind === "frontmatter") {
-            element.textContent =
-                line.text.length > 0 ? line.text : "\u200B";
+            const runs = highlights.lines.get(index);
+            if (runs) {
+                fillCodeLine(element, runs);
+            } else {
+                element.textContent =
+                    line.text.length > 0 ? line.text : "\u200B";
+            }
         } else {
             fillLine(element, line.text);
         }
@@ -223,7 +302,13 @@ export function buildSourceLineDom(
         fragment.appendChild(element);
     });
 
-    return { fragment, elements, headingLines, headingLevels };
+    return {
+        fragment,
+        elements,
+        headingLines,
+        headingLevels,
+        prismPending: highlights.pending,
+    };
 }
 
 /**

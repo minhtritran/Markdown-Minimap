@@ -102,6 +102,77 @@ export function getProtectedLines(this: void, lines: string[]): boolean[] {
     return protectedLines;
 }
 
+export interface FencedCodeBlock {
+    /** Zero-based index of the opening fence line. */
+    open: number;
+    /**
+     * Zero-based index of the closing fence line, or `lines.length` when the
+     * fence is never closed — which is what the editor shows while one is
+     * still being typed.
+     */
+    close: number;
+    /**
+     * First word of the info string, lowercased, or empty when the fence
+     * carries none. Empty as well for a fence inside a blockquote: every line
+     * of that block still starts with `>`, which is not part of the code and
+     * would be tokenized as if it were.
+     */
+    language: string;
+}
+
+const FENCE_INFO = /^ {0,3}(?:`{3,}|~{3,})\s*([^\s`{]+)/;
+
+function getFenceLanguage(this: void, line: string): string {
+    if (/^ {0,3}> ?/.test(line)) return "";
+    const match = line.match(FENCE_INFO);
+    return match ? match[1].toLowerCase() : "";
+}
+
+/**
+ * Extents and languages of the note's fenced code blocks, so the minimap can
+ * highlight what is inside them. Uses the same fence walk as
+ * `getProtectedLines` so the two always agree about where a block starts and
+ * ends; frontmatter is skipped because it is not a fence.
+ */
+export function getFencedCodeBlocks(
+    this: void,
+    lines: string[]
+): FencedCodeBlock[] {
+    const blocks: FencedCodeBlock[] = [];
+    let fence: Fence | null = null;
+    let open = 0;
+    let language = "";
+
+    for (
+        let index = getFrontmatterLineCount(lines);
+        index < lines.length;
+        index++
+    ) {
+        const lineFence = getFence(lines[index]);
+
+        if (fence) {
+            if (
+                lineFence?.character === fence.character &&
+                lineFence.length >= fence.length
+            ) {
+                blocks.push({ open, close: index, language });
+                fence = null;
+            }
+            continue;
+        }
+
+        if (lineFence) {
+            fence = lineFence;
+            open = index;
+            language = getFenceLanguage(lines[index]);
+        }
+    }
+
+    if (fence) blocks.push({ open, close: lines.length, language });
+
+    return blocks;
+}
+
 /**
  * Obsidian's Markdown renderer intentionally collapses consecutive blank
  * source lines. Insert one inert marker for each collapsed run while retaining

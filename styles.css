@@ -145,6 +145,9 @@
     font-size: var(--code-size);
     line-height: var(--line-height-normal, 1.5);
     background-color: var(--code-background);
+    /* Everything Prism does not mark — and the fences themselves, which are
+       not code — takes the same colour the editor gives unhighlighted code. */
+    color: var(--code-normal, var(--text-normal));
 }
 
 .minimap-content-source .minimap-source-line.mod-h1 {
