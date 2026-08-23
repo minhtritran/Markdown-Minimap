@@ -38,6 +38,8 @@ export class Minimap implements PointerHost {
     sourceView: HTMLElement;
     scroller: HTMLElement | null = null;
     container: HTMLDivElement | null = null;
+    /** Positions and scales the panel; carries no Obsidian classes. */
+    viewport: HTMLDivElement | null = null;
     content: HTMLDivElement | null = null;
     slider: HTMLDivElement | null = null;
     hitbox: HTMLDivElement | null = null;
@@ -111,7 +113,7 @@ export class Minimap implements PointerHost {
     setupElements() {
         this.element
             .querySelectorAll(
-                ".minimap-container, .minimap-content, .minimap-slider, .minimap-hitbox"
+                ".minimap-container, .minimap-viewport, .minimap-content, .minimap-slider, .minimap-hitbox"
             )
             .forEach((e) => e.remove());
 
@@ -120,13 +122,32 @@ export class Minimap implements PointerHost {
         this.container = container;
         this.element.prepend(container);
 
+        // The panel is positioned by this wrapper and rendered by the element
+        // inside it, which is not a distinction the panel used to draw. The
+        // rendered element wears Obsidian's own "markdown-preview-view" so the
+        // note's Markdown styling applies to the copy — but Obsidian styles
+        // that class too, `position: relative` among them, and on mobile a rule
+        // of its own outranked the panel's `position: absolute`. The panel then
+        // took its static position at the container's left edge, so instead of
+        // being pinned to the right of the pane it landed a document-width in
+        // from the left: mid-screen on a tablet in landscape, and drifting as
+        // the note's width changed. Issue #11.
+        //
+        // Splitting the two means the placement no longer rides on a class
+        // Obsidian is free to style. The wrapper carries a name nothing else
+        // targets, and the rendered element inside it is in normal flow with no
+        // offsets of its own, so a rule that moves it has nothing to move.
+        this.viewport = activeDocument.createElement("div");
+        this.viewport.className = "minimap-viewport";
+        container.appendChild(this.viewport);
+
         this.content = activeDocument.createElement("div");
         // "show-properties" is what re-enables Obsidian's own rule for the
         // properties widget; rendered Markdown hides it by default, so without
         // this the cloned properties collapse to zero height and render blank.
         this.content.className =
             "minimap-content markdown-preview-view markdown-rendered show-properties";
-        container.appendChild(this.content);
+        this.viewport.appendChild(this.content);
 
         this.slider = activeDocument.createElement("div");
         this.slider.className = "minimap-slider";
@@ -269,6 +290,7 @@ export class Minimap implements PointerHost {
         this.element.classList.remove("minimap-content-shifted");
 
         this.container = null;
+        this.viewport = null;
         this.content = null;
         this.slider = null;
         this.hitbox = null;
@@ -738,7 +760,13 @@ export class Minimap implements PointerHost {
     }
 
     updateSliderScroll = () => {
-        if (!this.container || !this.content || !this.slider || !this.hitbox)
+        if (
+            !this.container ||
+            !this.viewport ||
+            !this.content ||
+            !this.slider ||
+            !this.hitbox
+        )
             return;
         this.syncScroller();
         if (!this.scroller) return;
@@ -760,7 +788,7 @@ export class Minimap implements PointerHost {
                 Math.max(0, metrics.activeHeight - metrics.sliderHeight)
             );
 
-        this.content.style.top = `${
+        this.viewport.style.top = `${
             (this.topOffset || 0) - metrics.minimapScrollOffset
         }px`;
         this.slider.style.top = `${sliderTop}px`;

@@ -10,24 +10,48 @@
     overflow: hidden;
 }
 
-/* The extra specificity intentionally overrides .markdown-preview-view's
-   height/overflow so the content keeps its natural rendered height.
+/* Everything about where the panel sits lives here, on a class Obsidian does
+   not style. It used to live on the element below, which also wears Obsidian's
+   own `markdown-preview-view` so the note's styling reaches the copy — and on
+   mobile a rule of Obsidian's own outranked this `position: absolute`. The
+   panel fell back to its static position at the container's left edge, which
+   put it a document-width in from the left instead of against the right of the
+   pane: mid-screen on a tablet in landscape. Issue #11.
+
    The width and top padding mirror the note's own layout so lines wrap at the
-   same points they do in the editor. */
-.minimap-container .minimap-content {
+   same points they do in the editor. `transform-origin` keeps the right edge
+   pinned while the width follows the note's. */
+.minimap-container .minimap-viewport {
     position: absolute;
     top: 0;
     right: var(--minimap-scrollbar-gutter, 14px);
     width: var(--minimap-doc-width, 100%);
-    height: auto;
-    overflow: visible;
-    padding: var(--minimap-doc-padding-top, 0px) 0
-        var(--minimap-doc-trailing, 0px) 0;
     pointer-events: none;
     user-select: none;
     scale: var(--scale);
     transform-origin: top right;
     z-index: 1;
+}
+
+/* Fills the wrapper and takes no part in placing it. `position: relative` is
+   what Obsidian gives `.markdown-preview-view` anyway, so keeping it leaves
+   descendants that position against it — collapse indicators, search
+   highlights — resolving against the same box they always did. The offsets are
+   pinned to `auto` so a rule that sets one cannot drag the rendered copy out
+   of its wrapper.
+
+   The extra specificity intentionally overrides .markdown-preview-view's
+   height/overflow so the content keeps its natural rendered height. */
+.minimap-container .minimap-viewport > .minimap-content {
+    position: relative;
+    inset: auto;
+    margin: 0;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    padding: var(--minimap-doc-padding-top, 0px) 0
+        var(--minimap-doc-trailing, 0px) 0;
 }
 
 /* Sized to the height the properties occupy in the note itself, whether they
