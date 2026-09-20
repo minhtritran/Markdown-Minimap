@@ -1,4 +1,5 @@
 import type { MarkdownView } from "obsidian";
+import { collectRenderedHeadings } from "./anchors";
 
 /**
  * Mirroring the note's collapsed sections onto the panel.
@@ -103,20 +104,6 @@ export function resolveFoldRanges(
 }
 
 const HIDDEN_CLASS = "minimap-folded";
-const HEADING_SELECTOR = "h1,h2,h3,h4,h5,h6,.minimap-source-heading";
-
-/** The panel-level block a heading belongs to, since headings can be nested. */
-function topLevelBlock(
-    this: void,
-    heading: HTMLElement,
-    content: HTMLElement
-): HTMLElement | null {
-    let node: HTMLElement | null = heading;
-    while (node && node.parentElement && node.parentElement !== content) {
-        node = node.parentElement;
-    }
-    return node?.parentElement === content ? node : null;
-}
 
 /**
  * Hide the panel blocks covered by each fold.
@@ -148,9 +135,7 @@ export function applyFoldsToPanel(
         .forEach((node) => node.classList.remove(HIDDEN_CLASS));
     if (ranges.length === 0) return hidden;
 
-    const rendered = Array.from(
-        content.querySelectorAll<HTMLElement>(HEADING_SELECTOR)
-    );
+    const rendered = collectRenderedHeadings(content);
     // The same pairing the anchors rely on. If the two lists disagree the
     // ordinals mean nothing, and folding the wrong blocks is worse than folding
     // none of them.
@@ -168,13 +153,12 @@ export function applyFoldsToPanel(
             }
         }
 
-        const start = topLevelBlock(rendered[index], content);
-        const end =
-            after < rendered.length
-                ? topLevelBlock(rendered[after], content)
-                : null;
-        // Both headings inside one block leaves nothing to hide between them.
-        if (!start || start === end) continue;
+        // Both lists hold only direct children of the panel, so the fold's
+        // heading and the first block past it are siblings and everything
+        // between them is the section.
+        const start = rendered[index];
+        const end = after < rendered.length ? rendered[after] : null;
+        if (!start) continue;
 
         for (
             let node = start.nextElementSibling;

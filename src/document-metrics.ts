@@ -8,6 +8,9 @@ import { clamp, computedStyle, pixels } from "./utils";
  * live editor rather than assumed.
  */
 
+/** Marks the view as having its text moved clear of the minimap. */
+const SHIFTED_CLASS = "minimap-content-shifted";
+
 export interface DocumentElements {
     scroller: HTMLElement | null;
     sizer: HTMLElement | null;
@@ -175,12 +178,21 @@ function reserveShift(
  * scroller's padding.
  *
  * Read from the sizer's own box rather than from the text width, so a line's
- * own inset does not creep into it. Stable while the shift is applied, because
- * the two margins written below are equal and opposite and therefore leave the
- * sizer's width — and so this number — exactly where they found it.
+ * own inset does not creep into it — but read with the shift lifted, which is
+ * the part that matters. The two margins written below are equal and opposite,
+ * so they leave the sizer's width alone only while that width is the theme's
+ * readable line length. Once the pane is narrow enough that the margins are
+ * what the width is subtracted from, measuring the shifted sizer feeds this
+ * number its own previous answer: the margins reproduce themselves exactly, so
+ * a text column squeezed by one bad measurement mid-resize stays squeezed
+ * through every later resize and only a refresh clears it. Issue #12.
+ *
+ * Lifting the class and restoring it without yielding costs one synchronous
+ * layout and paints nothing in between.
  */
 function baseSizerMargin(
     this: void,
+    element: HTMLElement,
     scroller: HTMLElement | null,
     sizer: HTMLElement | null
 ): number {
@@ -190,8 +202,14 @@ function baseSizerMargin(
         scroller.clientWidth -
         pixels(style?.paddingLeft) -
         pixels(style?.paddingRight);
+    if (available <= 0) return 0;
+
+    const shifted = element.classList.contains(SHIFTED_CLASS);
+    if (shifted) element.classList.remove(SHIFTED_CLASS);
     const width = sizer.getBoundingClientRect().width;
-    if (available <= 0 || width <= 0) return 0;
+    if (shifted) element.classList.add(SHIFTED_CLASS);
+
+    if (width <= 0) return 0;
     return Math.max(0, (available - width) / 2);
 }
 
@@ -218,10 +236,10 @@ function applyContentShift(
         element.style.removeProperty("--minimap-content-shift");
         element.style.removeProperty("--minimap-sizer-margin-left");
         element.style.removeProperty("--minimap-sizer-margin-right");
-        element.classList.remove("minimap-content-shifted");
+        element.classList.remove(SHIFTED_CLASS);
         return;
     }
-    const base = baseSizerMargin(scroller, sizer);
+    const base = baseSizerMargin(element, scroller, sizer);
     element.style.setProperty("--minimap-content-shift", `${shift}px`);
     element.style.setProperty(
         "--minimap-sizer-margin-left",
@@ -231,7 +249,7 @@ function applyContentShift(
         "--minimap-sizer-margin-right",
         `${base + shift}px`
     );
-    element.classList.add("minimap-content-shifted");
+    element.classList.add(SHIFTED_CLASS);
 }
 
 /**

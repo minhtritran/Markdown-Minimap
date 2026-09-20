@@ -2,7 +2,11 @@ import { Component, MarkdownRenderer, MarkdownView } from "obsidian";
 import { EditorView } from "@codemirror/view";
 import { prepareBlankLineRuns } from "./blank-lines";
 import type { BlankLineRun } from "./blank-lines";
-import { AnchorTracker } from "./anchors";
+import {
+    AnchorTracker,
+    collectRenderedHeadings,
+    readCachedHeadings,
+} from "./anchors";
 import { mirrorCodeMetrics, mirrorDocumentMetrics } from "./document-metrics";
 import {
     applyFoldsToPanel,
@@ -57,6 +61,8 @@ export class Minimap implements PointerHost {
     backgroundColor = "";
     renderVersion = 0;
     trailingSyncTimer = 0;
+    /** Pending second measuring pass after a pane resize. */
+    private resizeSettleTimer = 0;
 
     readonly anchors = new AnchorTracker();
     private readonly pointer = new MinimapPointer(this);
@@ -275,6 +281,7 @@ export class Minimap implements PointerHost {
     destroy() {
         this.renderVersion++; // invalidate any in-flight render
         window.clearTimeout(this.trailingSyncTimer);
+        window.clearTimeout(this.resizeSettleTimer);
         window.clearTimeout(this.foldCheckTimer);
         this.foldObserver?.disconnect();
         this.foldObserver = null;
@@ -635,10 +642,40 @@ export class Minimap implements PointerHost {
             this.content.appendChild(rendered.firstChild);
         }
 
-        this.headingLines = data.headingLines;
-        this.headingLevels = data.headingLevels;
+        this.applyHeadingIndex(data.headingLines, data.headingLevels);
         this.lineCount = data.lineCount;
         this.afterRender();
+    }
+
+    /**
+     * Adopt the scanned heading index, or Obsidian's own if the scan and the
+     * panel disagree about how many headings the note has.
+     *
+     * The pairing is by ordinal, so a disagreement means every ordinal is
+     * suspect and both the folds and the anchors switch off for the whole note.
+     * That cliff is the real cost of a missed heading, and the metadata cache
+     * is a good second opinion precisely when the scanner has been surprised:
+     * it is what Obsidian folds and outlines from. It lags the editor by a save
+     * though, so it is checked against the live text before it is trusted, and
+     * only used when it resolves the disagreement rather than merely differing.
+     * Issue #13.
+     */
+    private applyHeadingIndex(lines: number[], levels: number[]) {
+        this.headingLines = lines;
+        this.headingLevels = levels;
+
+        const rendered = collectRenderedHeadings(this.content).length;
+        if (rendered === lines.length) return;
+
+        const cached = readCachedHeadings(
+            this.plugin.app,
+            this.view.file,
+            this.view.getViewData()
+        );
+        if (!cached || cached.lines.length !== rendered) return;
+
+        this.headingLines = cached.lines;
+        this.headingLevels = cached.levels;
     }
 
     private addInlineTitle(basename: string) {
@@ -694,6 +731,20 @@ export class Minimap implements PointerHost {
         // Wait for Obsidian's editor layout pass before measuring scroll
         // dimensions; immediate reads can be stale after mode or pane changes.
         await sleep(300);
+        this.remeasure();
+        // A pane that has not finished settling — a window still animating out
+        // of maximize, an edge being dragged, a sidebar collapsing — reports
+        // geometry belonging to a layout it has already left. Measuring once
+        // and trusting it is what left the panel sized for the old pane until
+        // someone pressed refresh, so take one more reading after it quietens.
+        // Issue #12.
+        window.clearTimeout(this.resizeSettleTimer);
+        this.resizeSettleTimer = window.setTimeout(this.remeasure, 400);
+    }
+
+    /** One full measuring pass over the note's layout. */
+    private remeasure = () => {
+        if (!this.content) return;
         this.syncDocumentMetrics();
         // CodeMirror replaces its height estimates with measurements as lines
         // are rendered, so refresh from it before re-anchoring.
@@ -711,7 +762,7 @@ export class Minimap implements PointerHost {
         );
         // Sync now and once more after CodeMirror's height estimate settles.
         this.onScroll();
-    }
+    };
 
     /**
      * `scrollTopOverride` asks "what would the geometry be if we scrolled

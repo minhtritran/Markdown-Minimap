@@ -168,8 +168,13 @@ end of a long note.
 at the same rate the note does, which it doesn't — small per-block differences
 accumulate into hundreds of pixels over a long note. Instead both coordinate
 spaces are anchored to positions that exist in each, and positions between them
-are interpolated. If the source headings and rendered ones ever disagree in
-count, it falls back to the global ratio rather than risk a wrong pairing.
+are interpolated. Those positions are the note's headings: ATX headings that
+start a line and setext headings (text underlined with `===` or `---`). A `#`
+inside a list item, a blockquote, a callout or an embedded note renders as a
+heading but isn't one of the note's own — Obsidian won't fold it or list it in
+the outline — so the panel skips those too and the two lists stay in step. If
+they ever disagree in count anyway, Obsidian's own heading index is consulted
+before falling back to the global ratio, rather than risking a wrong pairing.
 Reading view virtualizes its sections, so it uses the global ratio.
 
 ## 🛠️ Development

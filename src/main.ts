@@ -26,7 +26,11 @@ export default class NoteMinimap extends Plugin {
     deviceDisabled = false;
 
     async onload() {
-        // Handle resize
+        // Handle resize. The window sends these in bursts while an edge is
+        // dragged, so they are throttled — but only far enough to coalesce a
+        // burst. At a second the panel stayed sized for the old pane for well
+        // over a second after the drag stopped, which reads as not updating at
+        // all. Issue #12.
         const resized = new Set<Element>();
         const resize = throttle(() => {
             for (const el of resized) {
@@ -34,7 +38,7 @@ export default class NoteMinimap extends Plugin {
                 if (note) void note.onResize();
             }
             resized.clear();
-        }, 1000);
+        }, 250);
         this.resizeObserver = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 resized.add(entry.target);

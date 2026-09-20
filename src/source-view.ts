@@ -26,17 +26,6 @@ export interface SourceLine {
     level: number;
 }
 
-const BLOCKQUOTE_PREFIX = /^ {0,3}> ?/;
-
-function headingLevel(this: void, line: string): number {
-    let text = line;
-    while (BLOCKQUOTE_PREFIX.test(text)) {
-        text = text.replace(BLOCKQUOTE_PREFIX, "");
-    }
-    const match = text.match(/^ {0,3}(#{1,6})(?:\s|$)/);
-    return match ? match[1].length : 1;
-}
-
 export function classifySourceLines(
     this: void,
     markdown: string
@@ -44,18 +33,26 @@ export function classifySourceLines(
     const lines = markdown.split(/\r?\n/);
     const protectedLines = getProtectedLines(lines);
     const frontmatterLines = getFrontmatterLineCount(lines);
-    const headings = new Set(collectHeadings(lines, protectedLines).lines);
+    // Levels come from the same pass that found the headings rather than being
+    // read back off the text. A setext heading carries no `#` to read, so
+    // re-deriving the level landed every one of them on h1.
+    const index = collectHeadings(lines, protectedLines);
+    const headingLevelOf = new Map<number, number>();
+    index.lines.forEach((line, ordinal) => {
+        headingLevelOf.set(line, index.levels[ordinal]);
+    });
 
-    return lines.map((text, index) => {
-        const lineNumber = index + 1;
+    return lines.map((text, lineIndex) => {
+        const lineNumber = lineIndex + 1;
         if (lineNumber <= frontmatterLines) {
             return { text, kind: "frontmatter", level: 0 };
         }
-        if (protectedLines[index]) {
+        if (protectedLines[lineIndex]) {
             return { text, kind: "code", level: 0 };
         }
-        if (headings.has(lineNumber)) {
-            return { text, kind: "heading", level: headingLevel(text) };
+        const level = headingLevelOf.get(lineNumber);
+        if (level !== undefined) {
+            return { text, kind: "heading", level };
         }
         return { text, kind: "text", level: 0 };
     });

@@ -90,7 +90,15 @@
     display: none;
 }
 
-.minimap-content .markdown-minimap-blank-run {
+/* The `:not()` is what keeps a folded section from leaving its height behind.
+   These markers carry an explicit pixel height, and in the editing modes that
+   height is the only thing holding the panel's blank lines open. This rule
+   matches at the same specificity as the fold rule above and is declared after
+   it, so `display: block` won the cascade on the markers alone: the note's
+   blocks vanished while their spacing stayed, and a folded section collapsed
+   to an empty gap of its original size. Reading view never showed it because
+   the markers are left unsized there. Issue #14. */
+.minimap-content .markdown-minimap-blank-run:not(.minimap-folded) {
     display: block;
     min-height: 0;
     margin: 0;
