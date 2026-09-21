@@ -9,7 +9,7 @@ import { clamp, computedStyle, pixels } from "./utils";
  */
 
 /** Marks the view as having its text moved clear of the minimap. */
-const SHIFTED_CLASS = "minimap-content-shifted";
+const SHIFTED_CLASS = "source-minimap-content-shifted";
 
 export interface DocumentElements {
     scroller: HTMLElement | null;
@@ -241,20 +241,20 @@ function applyContentShift(
     shift: number
 ): void {
     if (shift <= 0) {
-        element.style.removeProperty("--minimap-content-shift");
-        element.style.removeProperty("--minimap-sizer-margin-left");
-        element.style.removeProperty("--minimap-sizer-margin-right");
+        element.style.removeProperty("--source-minimap-content-shift");
+        element.style.removeProperty("--source-minimap-sizer-margin-left");
+        element.style.removeProperty("--source-minimap-sizer-margin-right");
         element.classList.remove(SHIFTED_CLASS);
         return;
     }
     const base = baseSizerMargin(element, scroller, sizer);
-    element.style.setProperty("--minimap-content-shift", `${shift}px`);
+    element.style.setProperty("--source-minimap-content-shift", `${shift}px`);
     element.style.setProperty(
-        "--minimap-sizer-margin-left",
+        "--source-minimap-sizer-margin-left",
         `${base - shift}px`
     );
     element.style.setProperty(
-        "--minimap-sizer-margin-right",
+        "--source-minimap-sizer-margin-right",
         `${base + shift}px`
     );
     element.classList.add(SHIFTED_CLASS);
@@ -309,8 +309,8 @@ export function mirrorDocumentMetrics(
     // Read the unreserved layout first so repeated resizes cannot compound
     // our own padding. The strip and editor then share the available width:
     // text + scale * text + gap + scrollbar gutter = pane width.
-    element.classList.remove("minimap-source-reserved");
-    element.style.removeProperty("--minimap-editor-padding-right");
+    element.classList.remove("source-minimap-source-reserved");
+    element.style.removeProperty("--source-minimap-editor-padding-right");
     if (rawSourceMode) {
         applyContentShift(element, scroller, sizer, 0);
         if (options.reserveSpace && scroller && scroller.clientWidth > 0) {
@@ -319,15 +319,15 @@ export function mirrorDocumentMetrics(
             const width = measureTextWidth(element, false, sizer);
             const available = scroller.clientWidth - pixels(style?.paddingLeft);
             const right = sourceRightPadding(available, width, baseRight, options.scale, options.scrollbarGutter);
-            element.style.setProperty("--minimap-editor-padding-right", `${right}px`);
-            element.classList.add("minimap-source-reserved");
+            element.style.setProperty("--source-minimap-editor-padding-right", `${right}px`);
+            element.classList.add("source-minimap-source-reserved");
         }
     }
 
     const textWidth = measureTextWidth(element, readMode, sizer);
     // A hidden pane measures 0; keep the last good width.
     if (textWidth > 0) {
-        container.style.setProperty("--minimap-doc-width", `${textWidth}px`);
+        container.style.setProperty("--source-minimap-doc-width", `${textWidth}px`);
     }
 
     // Bind the track to the editor's visible height. Left to `height: 100%` it
@@ -335,7 +335,7 @@ export function mirrorDocumentMetrics(
     // the window where the pointer cannot reach it.
     if (scroller && scroller.clientHeight > 0) {
         container.style.setProperty(
-            "--minimap-track-height",
+            "--source-minimap-track-height",
             `${scroller.clientHeight}px`
         );
     }
@@ -343,7 +343,7 @@ export function mirrorDocumentMetrics(
     const paddingTop =
         pixels(computedStyle(scroller)?.paddingTop) +
         pixels(computedStyle(sizer)?.paddingTop);
-    container.style.setProperty("--minimap-doc-padding-top", `${paddingTop}px`);
+    container.style.setProperty("--source-minimap-doc-padding-top", `${paddingTop}px`);
     // The file margin below the last line, and the room Obsidian leaves for
     // scrolling past the end, are both part of the scroll range the thumb
     // travels. The panel needs its own counterpart rather than the mapping
@@ -352,7 +352,7 @@ export function mirrorDocumentMetrics(
         pixels(computedStyle(scroller)?.paddingBottom) +
         measureTrailingPadding(element, readMode, scroller);
     container.style.setProperty(
-        "--minimap-doc-trailing",
+        "--source-minimap-doc-trailing",
         `${scaleTrailingSpace(content, scroller, editorTrailing)}px`
     );
 
@@ -391,7 +391,7 @@ export function mirrorDocumentMetrics(
     const lineStyle = computedStyle(line) ?? textStyle;
     for (const property of ["white-space", "overflow-wrap", "word-break"] as const) {
         const value = rawSourceMode ? lineStyle?.getPropertyValue(property) : "";
-        container.style.setProperty(`--minimap-source-${property}`, value || "initial");
+        container.style.setProperty(`--source-minimap-source-${property}`, value || "initial");
     }
 }
 
@@ -427,25 +427,25 @@ export function mirrorCodeMetrics(
         content.clientWidth - innerWidth - paddingLeft
     );
     container.style.setProperty(
-        "--minimap-code-padding-left",
+        "--source-minimap-code-padding-left",
         `${paddingLeft}px`
     );
     container.style.setProperty(
-        "--minimap-code-padding-right",
+        "--source-minimap-code-padding-right",
         `${paddingRight}px`
     );
     const codeLineHeight = Number.parseFloat(style?.lineHeight ?? "");
     container.style.setProperty(
-        "--minimap-code-line-height",
+        "--source-minimap-code-line-height",
         Number.isFinite(codeLineHeight) ? `${codeLineHeight}px` : "normal"
     );
     const codeFontSize = Number.parseFloat(style?.fontSize ?? "");
     if (Number.isFinite(codeFontSize)) {
         container.style.setProperty(
-            "--minimap-code-font-size",
+            "--source-minimap-code-font-size",
             `${codeFontSize}px`
         );
     }
-    content.classList.add("minimap-mirror-code");
+    content.classList.add("source-minimap-mirror-code");
     return true;
 }

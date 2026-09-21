@@ -192,7 +192,7 @@ export class MinimapSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName("Reset to defaults")
-            .setDesc("Restore Markdown Minimap's default settings.")
+            .setDesc("Restore Source Minimap's default settings.")
             .addButton((button) => {
                 button
                     .setButtonText("Reset")

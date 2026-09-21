@@ -91,15 +91,15 @@ const INLINE_TOKEN = new RegExp(
 );
 
 const TOKEN_CLASS: Record<string, string> = {
-    code: "minimap-source-code-span",
-    embed: "minimap-source-link",
-    link: "minimap-source-link",
-    url: "minimap-source-link",
-    strong: "minimap-source-strong",
-    em: "minimap-source-em",
-    highlight: "minimap-source-highlight",
-    strike: "minimap-source-strike",
-    tag: "minimap-source-tag",
+    code: "source-minimap-source-code-span",
+    embed: "source-minimap-source-link",
+    link: "source-minimap-source-link",
+    url: "source-minimap-source-link",
+    strong: "source-minimap-source-strong",
+    em: "source-minimap-source-em",
+    highlight: "source-minimap-source-highlight",
+    strike: "source-minimap-source-strike",
+    tag: "source-minimap-source-tag",
 };
 
 const QUOTE_LINE = /^ {0,3}(?:> ?)+/;
@@ -139,7 +139,7 @@ function fillLine(this: void, element: HTMLElement, text: string) {
     const quote = rest.match(QUOTE_LINE);
     if (quote) {
         element.classList.add("mod-quote");
-        appendToken(element, quote[0], "minimap-source-marker");
+        appendToken(element, quote[0], "source-minimap-source-marker");
         rest = rest.slice(quote[0].length);
     }
     const marker = rest.match(LIST_MARKER);
@@ -148,7 +148,7 @@ function fillLine(this: void, element: HTMLElement, text: string) {
         appendToken(
             element,
             marker[2] + marker[3],
-            "minimap-source-marker"
+            "source-minimap-source-marker"
         );
         rest = rest.slice(marker[0].length);
     }
@@ -269,10 +269,10 @@ export function buildSourceLineDom(
 
     lines.forEach((line, index) => {
         const element = activeDocument.createElement("div");
-        element.className = "minimap-source-line";
+        element.className = "source-minimap-source-line";
         if (line.kind === "heading") {
             element.classList.add(
-                "minimap-source-heading",
+                "source-minimap-source-heading",
                 `mod-h${line.level}`
             );
             headingLines.push(index + 1);

@@ -184,7 +184,7 @@ export function collectRenderedHeadings(
     for (const child of Array.from(content.children)) {
         if (
             RENDERED_HEADING_TAGS.has(child.tagName) ||
-            child.classList.contains("minimap-source-heading")
+            child.classList.contains("source-minimap-source-heading")
         ) {
             headings.push(child as HTMLElement);
         }

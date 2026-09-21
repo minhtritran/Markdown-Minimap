@@ -214,10 +214,10 @@ export function prepareBlankLineRuns(
 
         if (isInternalRun) output.push("");
         if (sourceLineNumbers.length > 0) {
-            const markerClass = `markdown-minimap-blank-run-${runs.length}`;
+            const markerClass = `markdown-source-minimap-blank-run-${runs.length}`;
             runs.push({ markerClass, sourceLineNumbers });
             output.push(
-                `<div class="markdown-minimap-blank-run ${markerClass}" aria-hidden="true"></div>`
+                `<div class="markdown-source-minimap-blank-run ${markerClass}" aria-hidden="true"></div>`
             );
             if (end < lines.length) output.push("");
         }

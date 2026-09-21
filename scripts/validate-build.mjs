@@ -17,9 +17,9 @@ const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 const versions = JSON.parse(await readFile("versions.json", "utf8"));
 
 const expected = {
-  id: "markdown-minimap",
-  name: "Markdown Minimap",
-  packageName: "markdown-minimap",
+  id: "source-minimap",
+  name: "Source Minimap",
+  packageName: "source-minimap",
 };
 
 if (manifest.id !== expected.id) {
@@ -43,8 +43,13 @@ if (!versions[manifest.version]) {
 }
 
 const mainJs = await readFile("main.js", "utf8");
+const css = await readFile("styles.css", "utf8");
+if (css.includes(".minimap-") || css.includes("--minimap-") ||
+    mainJs.includes("markdown-minimap:disabled") || mainJs.includes('".minimap-')) {
+  throw new Error("Source Minimap must not reuse the original plugin's CSS or device preference namespace");
+}
 if (mainJs.includes('disablePlugin("minimap")') || mainJs.includes('enablePlugin("minimap")')) {
   throw new Error("main.js still references the upstream minimap plugin id");
 }
 
-console.log("Markdown Minimap baseline plugin files are valid.");
+console.log("Source Minimap plugin files are valid.");

@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: minimap-release
+  group: source-minimap-release
   cancel-in-progress: false
 
 jobs:
@@ -45,6 +45,6 @@ jobs:
           gh release create "${version}" main.js manifest.json styles.css \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
-            --title "${version} — Stable Source-mode minimap" \
+            --title "${version} — Source Minimap" \
             --notes-file RELEASE_NOTES.md \
             "${flags[@]}"

@@ -1,4 +1,4 @@
-# Minhtri's Markdown Minimap fork
+# Source Minimap
 
 Source-mode improvements over Nymbo/Markdown-Minimap 2.6.0:
 
@@ -13,8 +13,8 @@ Source-mode improvements over Nymbo/Markdown-Minimap 2.6.0:
 ## Install with BRAT
 
 Use `minhtritran/Markdown-Minimap` as the beta plugin repository after the release assets are published.
-The plugin ID remains `markdown-minimap`: this fork replaces the original, rather than running alongside it.
-Back up `.obsidian/plugins/markdown-minimap/data.json` before replacing an existing installation if you want to preserve its settings.
+The separate plugin ID is `source-minimap`, so BRAT installs it into `.obsidian/plugins/source-minimap/` and leaves Markdown Minimap and its settings untouched. CSS classes, CSS variables, toolbar buttons and device preferences are also namespaced independently.
+Both plugins can remain installed. Disable the original Markdown Minimap when using this fork so you do not display two minimaps in the same location.
 Remove earlier minimap CSS overrides for fixed widths, padding, line heights or opacity before testing this version.
 
 ## Verification and limits

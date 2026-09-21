@@ -124,12 +124,12 @@ export class Minimap implements PointerHost {
     setupElements() {
         this.element
             .querySelectorAll(
-                ".minimap-container, .minimap-viewport, .minimap-content, .minimap-slider, .minimap-hitbox"
+                ".source-minimap-container, .source-minimap-viewport, .source-minimap-content, .source-minimap-slider, .source-minimap-hitbox"
             )
             .forEach((e) => e.remove());
 
         const container = activeDocument.createElement("div");
-        container.className = "minimap-container";
+        container.className = "source-minimap-container";
         this.container = container;
         this.element.prepend(container);
 
@@ -149,7 +149,7 @@ export class Minimap implements PointerHost {
         // targets, and the rendered element inside it is in normal flow with no
         // offsets of its own, so a rule that moves it has nothing to move.
         this.viewport = activeDocument.createElement("div");
-        this.viewport.className = "minimap-viewport";
+        this.viewport.className = "source-minimap-viewport";
         container.appendChild(this.viewport);
 
         this.content = activeDocument.createElement("div");
@@ -157,15 +157,15 @@ export class Minimap implements PointerHost {
         // properties widget; rendered Markdown hides it by default, so without
         // this the cloned properties collapse to zero height and render blank.
         this.content.className =
-            "minimap-content markdown-preview-view markdown-rendered show-properties";
+            "source-minimap-content markdown-preview-view markdown-rendered show-properties";
         this.viewport.appendChild(this.content);
 
         this.slider = activeDocument.createElement("div");
-        this.slider.className = "minimap-slider";
+        this.slider.className = "source-minimap-slider";
         container.appendChild(this.slider);
 
         this.hitbox = activeDocument.createElement("div");
-        this.hitbox.className = "minimap-hitbox";
+        this.hitbox.className = "source-minimap-hitbox";
         container.appendChild(this.hitbox);
     }
 
@@ -269,7 +269,7 @@ export class Minimap implements PointerHost {
      */
     private syncFrontmatterHeight(): boolean {
         const wrapper = this.content?.querySelector<HTMLElement>(
-            ".markdown-minimap-properties"
+            ".markdown-source-minimap-properties"
         );
         if (!wrapper) return false;
         const widget = findMetadataContainer(
@@ -304,10 +304,10 @@ export class Minimap implements PointerHost {
         this.renderComponent?.unload();
         this.renderComponent = null;
         this.container?.remove();
-        this.element.style.removeProperty("--minimap-content-shift");
-        this.element.style.removeProperty("--minimap-sizer-margin-left");
-        this.element.style.removeProperty("--minimap-sizer-margin-right");
-        this.element.classList.remove("minimap-content-shifted");
+        this.element.style.removeProperty("--source-minimap-content-shift");
+        this.element.style.removeProperty("--source-minimap-sizer-margin-left");
+        this.element.style.removeProperty("--source-minimap-sizer-margin-right");
+        this.element.classList.remove("source-minimap-content-shifted");
 
         this.container = null;
         this.viewport = null;
@@ -317,8 +317,8 @@ export class Minimap implements PointerHost {
         this.scroller = null;
         this.anchors.clear();
         this.sourceMap.clear();
-        this.element.classList.remove("minimap-source-reserved");
-        this.element.style.removeProperty("--minimap-editor-padding-right");
+        this.element.classList.remove("source-minimap-source-reserved");
+        this.element.style.removeProperty("--source-minimap-editor-padding-right");
     }
 
     // --- settings --------------------------------------------------------
@@ -347,29 +347,29 @@ export class Minimap implements PointerHost {
 
     updateSettingsInCSS() {
         if (this.container) {
-            this.container.style.setProperty("--scale", String(this.scale));
-            this.container.style.setProperty("--minimap-text-opacity", String(this.textOpacity));
+            this.container.style.setProperty("--source-minimap-scale", String(this.scale));
+            this.container.style.setProperty("--source-minimap-text-opacity", String(this.textOpacity));
             this.container.style.setProperty(
-                "--minimap-top-offset",
+                "--source-minimap-top-offset",
                 `${this.topOffset || 0}px`
             );
             this.container.style.setProperty(
-                "--minimap-bottom-offset",
+                "--source-minimap-bottom-offset",
                 `${this.bottomOffset || 0}px`
             );
             this.container.style.setProperty(
-                "--minimap-scrollbar-gutter",
+                "--source-minimap-scrollbar-gutter",
                 `${this.scrollbarGutter || 0}px`
             );
             // The thumb has three states, so the settings are published as
             // variables the stylesheet resolves rather than a fixed opacity.
             // An inline opacity here would override every one of them.
             this.container.style.setProperty(
-                "--minimap-slider-opacity",
+                "--source-minimap-slider-opacity",
                 String(this.sliderOpacity)
             );
             this.container.style.setProperty(
-                "--minimap-slider-idle-opacity",
+                "--source-minimap-slider-idle-opacity",
                 String(this.sliderIdleOpacity)
             );
         }
@@ -480,7 +480,7 @@ export class Minimap implements PointerHost {
         // Reading view renders the same markup the minimap does, and Source
         // mode has no rendered code blocks to correct.
         if (this.isReadModeActive() || this.isRawSourceMode()) {
-            this.content.classList.remove("minimap-mirror-code");
+            this.content.classList.remove("source-minimap-mirror-code");
             this.codeMetricsMirrored = false;
             return;
         }
@@ -563,7 +563,7 @@ export class Minimap implements PointerHost {
         this.renderComponent = null;
 
         this.content.empty();
-        this.content.classList.add("minimap-content-source");
+        this.content.classList.add("source-minimap-content-source");
         this.addInlineTitle(file.basename);
         this.content.appendChild(dom.fragment);
 
@@ -613,7 +613,7 @@ export class Minimap implements PointerHost {
             this.renderSourceText();
             return;
         }
-        this.content.classList.remove("minimap-content-source");
+        this.content.classList.remove("source-minimap-content-source");
         this.sourceLineElements = [];
         this.sourceMap.clear();
         this.sourceMapInUse = false;
@@ -711,7 +711,7 @@ export class Minimap implements PointerHost {
         if (!this.content || !inlineTitle || inlineTitle.offsetHeight <= 0)
             return;
         this.content.createDiv({
-            cls: "inline-title minimap-inline-title",
+            cls: "inline-title source-minimap-inline-title",
             text: basename,
         });
     }

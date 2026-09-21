@@ -103,7 +103,7 @@ export function resolveFoldRanges(
     return ranges;
 }
 
-const HIDDEN_CLASS = "minimap-folded";
+const HIDDEN_CLASS = "source-minimap-folded";
 
 /**
  * Hide the panel blocks covered by each fold.

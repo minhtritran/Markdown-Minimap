@@ -1,4 +1,4 @@
-Source-mode fork of Markdown Minimap 2.6.0.
+Source Minimap — a separately installable Source-mode fork of Markdown Minimap 2.6.0.
 
 - Keep the full-note minimap layout stable while CodeMirror measures newly visited lines.
 - Map navigation by source line, including notes without headings and wrapped lines.
@@ -10,4 +10,4 @@ Source-mode fork of Markdown Minimap 2.6.0.
 
 Validation: eight regression tests, TypeScript check and production build passed. Not visually verified inside Obsidian. The separate renderer can still differ with custom themes, hanging indents, inline fold replacements and third-party editor decorations; Live Preview and Reading mode keep the upstream renderer.
 
-BRAT repository: minhtritran/Markdown-Minimap. This replaces the original plugin with the same ID. Back up its data.json if preserving settings, and remove old minimap CSS overrides before testing.
+BRAT repository: minhtritran/Markdown-Minimap. Its plugin ID is source-minimap, so the original Markdown Minimap and its settings remain untouched. Disable the original while using this fork to avoid overlapping minimaps. The fork uses its own CSS namespace and device preference key.

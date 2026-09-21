@@ -14,7 +14,7 @@ import { EditorView } from "@codemirror/view";
  * vault and never syncs it, which is the whole point: `data.json` travels with
  * the vault, so a setting stored there cannot mean "not on this phone".
  */
-const DEVICE_DISABLED_KEY = "markdown-minimap:disabled";
+const DEVICE_DISABLED_KEY = "source-minimap:disabled";
 
 export default class NoteMinimap extends Plugin {
     activeNoteView: MarkdownView | null = null;
@@ -162,7 +162,7 @@ export default class NoteMinimap extends Plugin {
 
         this.addCommand({
             id: "toggle-minimap",
-            name: "Toggle minimap for current note",
+            name: "Toggle Source Minimap for current note",
             checkCallback: (checking) => {
                 if (this.deviceDisabled) return false;
                 const view =
@@ -174,7 +174,7 @@ export default class NoteMinimap extends Plugin {
         });
         this.addCommand({
             id: "refresh-minimap",
-            name: "Refresh minimap for current note",
+            name: "Refresh Source Minimap for current note",
             checkCallback: (checking) => {
                 if (this.deviceDisabled) return false;
                 const view =
@@ -210,7 +210,7 @@ export default class NoteMinimap extends Plugin {
         for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
             leaf.view.containerEl
                 .querySelectorAll(
-                    ".minimap-toggle-button, .minimap-refresh-button"
+                    ".source-minimap-toggle-button, .source-minimap-refresh-button"
                 )
                 .forEach((button) => button.remove());
         }
@@ -249,7 +249,7 @@ export default class NoteMinimap extends Plugin {
         for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
             leaf.view.containerEl
                 .querySelectorAll(
-                    ".minimap-toggle-button, .minimap-refresh-button"
+                    ".source-minimap-toggle-button, .source-minimap-refresh-button"
                 )
                 .forEach((button) => button.remove());
         }
@@ -296,7 +296,7 @@ export default class NoteMinimap extends Plugin {
             return;
 
         // If disabled, remove the minimap if it exists
-        if (element.classList.contains("minimap-disabled")) {
+        if (element.classList.contains("source-minimap-disabled")) {
             this.destroyMinimapForElement(element);
             return;
         }
@@ -326,27 +326,27 @@ export default class NoteMinimap extends Plugin {
     addActionButtonsToView(view: MarkdownView) {
         if (this.deviceDisabled) return;
         // Avoid adding twice
-        if (view.containerEl.querySelector(".minimap-toggle-button")) return;
+        if (view.containerEl.querySelector(".source-minimap-toggle-button")) return;
 
-        const toggleButton = view.addAction("star-list", "Toggle minimap", () =>
+        const toggleButton = view.addAction("star-list", "Toggle Source Minimap", () =>
             this.toggleMinimapForView(view)
         );
-        toggleButton.addClass("minimap-toggle-button");
+        toggleButton.addClass("source-minimap-toggle-button");
 
         const refreshButton = view.addAction(
             "refresh-cw",
-            "Refresh minimap",
+            "Refresh Source Minimap",
             () => void this.refreshMinimapForView(view)
         );
-        refreshButton.addClass("minimap-refresh-button");
+        refreshButton.addClass("source-minimap-refresh-button");
 
         // Handle disable-by-default
         if (!this.settings.enabledByDefault)
-            view.contentEl.classList.add("minimap-disabled");
+            view.contentEl.classList.add("source-minimap-disabled");
     }
 
     toggleMinimapForView(view: MarkdownView) {
-        view.contentEl.classList.toggle("minimap-disabled");
+        view.contentEl.classList.toggle("source-minimap-disabled");
         void this.updateViewMinimap(view);
     }
 
