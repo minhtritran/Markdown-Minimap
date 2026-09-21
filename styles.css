@@ -154,14 +154,28 @@
    Obsidian's own Source-mode styling resolves, so the minimap reproduces the
    note's line layout rather than a rendered version of it. */
 .minimap-content-source .minimap-source-line {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    white-space: var(--minimap-source-white-space, pre-wrap);
+    overflow-wrap: var(--minimap-source-overflow-wrap, anywhere);
+    word-break: var(--minimap-source-word-break, normal);
     margin: 0;
     padding: 0;
     border: 0;
-    /* Each line's height is copied from CodeMirror, so clip rather than let a
-       line CodeMirror has not measured yet push the panel out of step. */
+    /* Lay out the whole note once. Never use CM's viewport-dependent height
+       estimates to size rows: those change on a line's first visit. */
     overflow: hidden;
+}
+
+.minimap-content > * {
+    opacity: var(--minimap-text-opacity, 0.55);
+}
+
+.minimap-content-source .minimap-source-line[hidden] {
+    display: none;
+}
+
+.minimap-source-reserved:not(.minimap-disabled)
+    .markdown-source-view.mod-cm6 .cm-scroller {
+    padding-right: var(--minimap-editor-padding-right);
 }
 
 /* Frontmatter keeps the body's size and line height in Source mode; only the

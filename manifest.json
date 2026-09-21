@@ -1,10 +1,10 @@
 {
-    "id": "markdown-minimap",
-    "name": "Markdown Minimap",
-    "author": "Nymbo",
-    "authorUrl": "https://github.com/Nymbo",
-    "description": "Add a minimap to your Markdown notes.",
-    "minAppVersion": "1.8.10",
-    "version": "2.6.0",
-    "isDesktopOnly": false
+  "id": "markdown-minimap",
+  "name": "Markdown Minimap",
+  "author": "Nymbo",
+  "authorUrl": "https://github.com/Nymbo",
+  "description": "Markdown minimap with stable Source-mode layout and line-based navigation. Fork by minhtritran.",
+  "minAppVersion": "1.8.10",
+  "version": "2.6.1",
+  "isDesktopOnly": false
 }

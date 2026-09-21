@@ -1,14 +1,18 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
-    tags:
-      - "*.*.*"
+    branches: [main]
+    paths: [manifest.json]
+    tags: ["*.*.*"]
 
 permissions:
   contents: write
-  id-token: write
-  attestations: write
+
+concurrency:
+  group: minimap-release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -20,24 +24,27 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm test
       - run: npm run build
-      - run: npm run lint
-      - uses: actions/attest@v4
-        with:
-          subject-path: |
-            main.js
-            manifest.json
-            styles.css
-      - env:
+      - name: Publish BRAT assets
+        env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          prerelease_flag=""
-          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
-            prerelease_flag="--prerelease"
+          version=$(node -p "require('./manifest.json').version")
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" != "${version}" ]]; then
+            echo "Tag must match manifest.json version"
+            exit 1
           fi
-          gh release create "${GITHUB_REF_NAME}" main.js manifest.json styles.css \
+          if gh release view "${version}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${version} already exists; leaving its assets unchanged."
+            exit 0
+          fi
+          flags=()
+          if [[ "${version}" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "${version}" main.js manifest.json styles.css \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "${GITHUB_REF_NAME}" \
-            --generate-notes \
-            ${prerelease_flag} \
-            --verify-tag
+            --target "${GITHUB_SHA}" \
+            --title "${version} — Stable Source-mode minimap" \
+            --notes-file RELEASE_NOTES.md \
+            "${flags[@]}"

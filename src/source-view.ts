@@ -1,4 +1,5 @@
 import type { EditorView } from "@codemirror/view";
+import { foldedRanges } from "@codemirror/language";
 import {
     getFencedCodeBlocks,
     getFrontmatterLineCount,
@@ -308,41 +309,25 @@ export function buildSourceLineDom(
     };
 }
 
-/**
- * Take each line's height from CodeMirror rather than trying to reproduce it.
- * The editor adds per-line padding and inline formatting spans that vary by
- * theme and line type, and its heightmap is in any case the authority for the
- * scroll space, so copying it is both exact and immune to theme styling.
- *
- * Returns the CodeMirror content height the copy was taken from, or null when
- * nothing was applied.
- */
-export function applySourceLineHeights(
-    this: void,
-    elements: HTMLElement[],
-    editorView: EditorView | null,
-    appliedContentHeight: number
-): number | null {
-    const doc = editorView?.state.doc;
-    if (!editorView || !doc) return null;
-    // CodeMirror swaps estimates for measurements as lines are rendered, which
-    // moves heights underneath us. Its total is a cheap signal that something
-    // changed, so the full walk only runs when it has.
-    if (editorView.contentHeight === appliedContentHeight) return null;
+/** Apply actual CM fold ranges, without importing its provisional heights. */
+export function applySourceFolds(elements: HTMLElement[], editor: EditorView | null) {
+    for (const element of elements) element.hidden = false;
+    if (!editor) return;
+    const doc = editor.state.doc;
+    foldedRanges(editor.state).between(0, doc.length, (from, to) => {
+        const first = doc.lineAt(from).number;
+        const last = doc.lineAt(to).number;
+        for (let line = first + 1; line <= last; line++) {
+            if (elements[line - 1]) elements[line - 1].hidden = true;
+        }
+    });
+}
 
-    for (let index = 0; index < elements.length; index++) {
-        const lineNumber = index + 1;
-        if (lineNumber > doc.lines) break;
-        const block = editorView.lineBlockAt(doc.line(lineNumber).from);
-        // A fold merges its lines into a single block, and every line inside it
-        // reports that block's whole height. Giving each of them the full value
-        // made a folded section taller in the panel than it had been unfolded,
-        // so the height goes to the line the block starts on and the rest
-        // collapse — which is what the editor shows.
-        const first = doc.lineAt(block.from).number;
-        const height = lineNumber === first ? block.height : 0;
-        elements[index].style.height = `${Math.max(0, height)}px`;
-    }
-
-    return editorView.contentHeight;
+export function sourceFoldSignature(editor: EditorView | null): string {
+    if (!editor) return "";
+    const ranges: string[] = [];
+    foldedRanges(editor.state).between(0, editor.state.doc.length, (from, to) => {
+        ranges.push(`${from}:${to}`);
+    });
+    return ranges.join(",");
 }

@@ -22,9 +22,11 @@ import {
 import { MinimapPointer } from "./pointer";
 import type { PointerHost } from "./pointer";
 import {
-    applySourceLineHeights,
+    applySourceFolds,
+    sourceFoldSignature,
     buildSourceLineDom,
 } from "./source-view";
+import { SourceMap } from "./source-map";
 import { isPrismReady, warmPrism } from "./prism";
 import {
     computeScrollMetrics,
@@ -33,7 +35,7 @@ import {
 import type { ScrollMetrics } from "./scroll-model";
 import type { MarkdownMinimapSettings } from "./settings";
 import type NoteMinimap from "./main";
-import { clamp, computedStyle, pixels, sleep, toRGBAAlpha } from "./utils";
+import { clamp, computedStyle, pixels, toRGBAAlpha } from "./utils";
 
 export class Minimap implements PointerHost {
     plugin: NoteMinimap;
@@ -50,6 +52,7 @@ export class Minimap implements PointerHost {
     renderComponent: Component | null = null;
     scale = 0.1;
     minimapOpacity = 0.3;
+    textOpacity = 0.55;
     sliderOpacity = 0.3;
     sliderIdleOpacity = 0.09;
     topOffset = 0;
@@ -63,6 +66,8 @@ export class Minimap implements PointerHost {
     trailingSyncTimer = 0;
     /** Pending second measuring pass after a pane resize. */
     private resizeSettleTimer = 0;
+    private resizeTimer = 0;
+    private sourceRenderFrame = 0;
 
     readonly anchors = new AnchorTracker();
     private readonly pointer = new MinimapPointer(this);
@@ -82,8 +87,8 @@ export class Minimap implements PointerHost {
     private codeMetricsMirrored = false;
     /** Source-mode line elements, index 0 being source line 1. */
     private sourceLineElements: HTMLElement[] = [];
-    /** CodeMirror content height the source line heights were copied from. */
-    private appliedContentHeight = -1;
+    private readonly sourceMap = new SourceMap();
+    private sourceMapInUse = false;
     /**
      * Whether the last metrics pass mapped through the anchors. The thumb's
      * position and the pointer's target have to come from the same mapping, so
@@ -220,6 +225,13 @@ export class Minimap implements PointerHost {
         // anything the Markdown renderer produced, so re-pin rather than
         // re-render the whole note. Checked before the signature, since the
         // widget can also be resized by editing a property.
+        if (this.isRawSourceMode()) {
+            const signature = sourceFoldSignature(this.getEditorView());
+            if (signature === this.foldSignature) return false;
+            this.foldSignature = signature;
+            this.refreshSourceLayout();
+            return true;
+        }
         const resized = this.syncFrontmatterHeight();
         const heads = readFoldHeads(this.view);
         const signature = heads.join(",");
@@ -230,8 +242,7 @@ export class Minimap implements PointerHost {
     }
 
     /**
-     * Source mode needs none of this: every line takes its height straight from
-     * CodeMirror, which has already collapsed the folded ones.
+     * Source mode applies actual CodeMirror fold ranges separately.
      */
     private applyFolds(foldHeads: number[]) {
         if (this.isRawSourceMode()) {
@@ -280,6 +291,8 @@ export class Minimap implements PointerHost {
 
     destroy() {
         this.renderVersion++; // invalidate any in-flight render
+        window.clearTimeout(this.resizeTimer);
+        this.element.ownerDocument.defaultView?.cancelAnimationFrame(this.sourceRenderFrame);
         window.clearTimeout(this.trailingSyncTimer);
         window.clearTimeout(this.resizeSettleTimer);
         window.clearTimeout(this.foldCheckTimer);
@@ -303,6 +316,9 @@ export class Minimap implements PointerHost {
         this.hitbox = null;
         this.scroller = null;
         this.anchors.clear();
+        this.sourceMap.clear();
+        this.element.classList.remove("minimap-source-reserved");
+        this.element.style.removeProperty("--minimap-editor-padding-right");
     }
 
     // --- settings --------------------------------------------------------
@@ -310,6 +326,7 @@ export class Minimap implements PointerHost {
     updateSettings(settings: MarkdownMinimapSettings) {
         this.scale = settings.scale;
         this.minimapOpacity = settings.minimapOpacity;
+        this.textOpacity = settings.textOpacity;
         this.sliderOpacity = settings.sliderOpacity;
         this.sliderIdleOpacity = settings.sliderIdleOpacity;
         this.topOffset = settings.topOffset;
@@ -331,6 +348,7 @@ export class Minimap implements PointerHost {
     updateSettingsInCSS() {
         if (this.container) {
             this.container.style.setProperty("--scale", String(this.scale));
+            this.container.style.setProperty("--minimap-text-opacity", String(this.textOpacity));
             this.container.style.setProperty(
                 "--minimap-top-offset",
                 `${this.topOffset || 0}px`
@@ -451,6 +469,8 @@ export class Minimap implements PointerHost {
             rawSourceMode: this.isRawSourceMode(),
             stripLeft: this.getStripLeft(),
             reserveSpace: this.reserveSpace,
+            scale: this.scale,
+            scrollbarGutter: this.scrollbarGutter,
         });
         this.syncCodeBlockMetrics();
     }
@@ -538,7 +558,7 @@ export class Minimap implements PointerHost {
         const file = this.view.file;
         if (!file || !this.content) return;
 
-        const dom = buildSourceLineDom(this.view.getViewData());
+        const dom = buildSourceLineDom(this.getEditorView()?.state.doc.toString() ?? this.view.getViewData());
         this.renderComponent?.unload();
         this.renderComponent = null;
 
@@ -548,8 +568,7 @@ export class Minimap implements PointerHost {
         this.content.appendChild(dom.fragment);
 
         this.sourceLineElements = dom.elements;
-        this.appliedContentHeight = -1;
-        this.refreshSourceLineHeights();
+        this.refreshSourceLayout();
 
         this.headingLines = dom.headingLines;
         this.headingLevels = dom.headingLevels;
@@ -569,13 +588,17 @@ export class Minimap implements PointerHost {
         }
     }
 
-    private refreshSourceLineHeights() {
-        const applied = applySourceLineHeights(
-            this.sourceLineElements,
-            this.getEditorView(),
-            this.appliedContentHeight
-        );
-        if (applied !== null) this.appliedContentHeight = applied;
+    private refreshSourceLayout() {
+        applySourceFolds(this.sourceLineElements, this.getEditorView());
+        this.sourceMap.capture(this.sourceLineElements);
+    }
+
+    scheduleSourceRender() {
+        if (this.sourceRenderFrame || !this.content) return;
+        this.sourceRenderFrame = this.element.ownerDocument.defaultView!.requestAnimationFrame(() => {
+            this.sourceRenderFrame = 0;
+            if (this.content && this.isRawSourceMode()) this.renderSourceText();
+        });
     }
 
     // Render the note's full Markdown source into the scaled minimap panel.
@@ -592,6 +615,8 @@ export class Minimap implements PointerHost {
         }
         this.content.classList.remove("minimap-content-source");
         this.sourceLineElements = [];
+        this.sourceMap.clear();
+        this.sourceMapInUse = false;
 
         const data = prepareBlankLineRuns(this.view.getViewData());
         const editorView = this.getEditorView();
@@ -697,7 +722,9 @@ export class Minimap implements PointerHost {
         // collapsed sections have to be folded back out of it before anything
         // measures the result.
         const foldHeads = readFoldHeads(this.view);
-        this.foldSignature = foldHeads.join(",");
+        this.foldSignature = this.isRawSourceMode()
+            ? sourceFoldSignature(this.getEditorView()) : foldHeads.join(",");
+        if (this.isRawSourceMode()) this.refreshSourceLayout();
         this.applyFolds(foldHeads);
         this.anchors.capture(
             this.content,
@@ -705,6 +732,7 @@ export class Minimap implements PointerHost {
             this.scale,
             this.hiddenHeadings
         );
+        this.updateSliderScroll();
         void this.onResize();
     }
 
@@ -718,37 +746,27 @@ export class Minimap implements PointerHost {
         this.trailingSyncTimer = window.setTimeout(this.settleAfterScroll, 350);
     };
 
-    // Refreshing every line height is too costly per scroll event, so it waits
-    // for scrolling to stop. Anchors keep the headings exact meanwhile; only
-    // positions within a heading's span drift until this runs.
+    // Source layout stays fixed during scrolling. Only navigation consults
+    // CodeMirror's changing height estimates; they never resize panel rows.
     settleAfterScroll = () => {
-        if (this.isRawSourceMode()) this.refreshSourceLineHeights();
         this.checkFolds();
         this.updateSliderScroll();
     };
 
     async onResize() {
-        // Wait for Obsidian's editor layout pass before measuring scroll
-        // dimensions; immediate reads can be stale after mode or pane changes.
-        await sleep(300);
-        this.remeasure();
-        // A pane that has not finished settling — a window still animating out
-        // of maximize, an edge being dragged, a sidebar collapsing — reports
-        // geometry belonging to a layout it has already left. Measuring once
-        // and trusting it is what left the panel sized for the old pane until
-        // someone pressed refresh, so take one more reading after it quietens.
-        // Issue #12.
-        window.clearTimeout(this.resizeSettleTimer);
-        this.resizeSettleTimer = window.setTimeout(this.remeasure, 400);
+        window.clearTimeout(this.resizeTimer);
+        this.resizeTimer = window.setTimeout(() => {
+            this.remeasure();
+            window.clearTimeout(this.resizeSettleTimer);
+            this.resizeSettleTimer = window.setTimeout(this.remeasure, 400);
+        }, 100);
     }
 
     /** One full measuring pass over the note's layout. */
     private remeasure = () => {
         if (!this.content) return;
         this.syncDocumentMetrics();
-        // CodeMirror replaces its height estimates with measurements as lines
-        // are rendered, so refresh from it before re-anchoring.
-        if (this.isRawSourceMode()) this.refreshSourceLineHeights();
+        if (this.isRawSourceMode()) this.refreshSourceLayout();
         // Fold the panel before it is measured, not after. Direct rather than
         // via checkFolds, which would call back into here.
         this.syncFoldState();
@@ -786,7 +804,7 @@ export class Minimap implements PointerHost {
         this.anchors.revalidate(heights.contentHeight);
         // Reading view virtualizes its sections, so anchors never apply there.
         const usable =
-            !this.isReadModeActive() &&
+            !this.isReadModeActive() && !this.isRawSourceMode() &&
             this.anchors.prepare(
                 this.getEditorView(),
                 this.getEditorContentOffset(),
@@ -794,6 +812,13 @@ export class Minimap implements PointerHost {
                 heights.contentHeight
             );
         this.anchorsInUse = usable;
+        const editor = this.getEditorView();
+        // documentTop excludes CM's top padding, unlike contentDOM's rect.
+        const sourceOffset = editor && scroller
+            ? editor.documentTop - scroller.getBoundingClientRect().top + scroller.scrollTop : 0;
+        this.sourceMapInUse = this.isRawSourceMode() && this.sourceMap.prepare(
+            editor, sourceOffset, heights.effectiveScrollHeight, heights.contentHeight
+        );
 
         return computeScrollMetrics({
             clientHeight,
@@ -806,7 +831,8 @@ export class Minimap implements PointerHost {
             contentHeight: heights.contentHeight,
             scale: this.scale,
             minViewportHeight: this.minViewportHeight,
-            mapToMinimap: usable ? this.anchors.toMinimap : null,
+            mapToMinimap: this.sourceMapInUse ? this.sourceMap.toMinimap
+                : usable ? this.anchors.toMinimap : null,
         });
     }
 
@@ -866,7 +892,8 @@ export class Minimap implements PointerHost {
      * reading view therefore jumped to the top, and dragging fought the thumb.
      */
     mapToEditor(minimapY: number): number | null {
-        return this.anchorsInUse ? this.anchors.toEditor(minimapY) : null;
+        return this.sourceMapInUse ? this.sourceMap.toEditor(minimapY)
+            : this.anchorsInUse ? this.anchors.toEditor(minimapY) : null;
     }
 
     onScrolled() {

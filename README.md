@@ -1,3 +1,38 @@
+# Minhtri's Markdown Minimap fork
+
+Source-mode improvements over Nymbo/Markdown-Minimap 2.6.0:
+
+- Stable full-note layout: scrolling no longer replaces minimap row heights with CodeMirror's provisional measurements.
+- Navigation maps every source line, including notes without headings and wrapped lines.
+- Track clicks target the text currently under the pointer. Subsequent dragging holds the viewport marker.
+- Source-mode spacing follows the scaled minimap width; no fixed 190px CSS gutter.
+- Tabs, whitespace, wrapping and letter spacing follow the editor's computed styles.
+- A separate **Text opacity** setting defaults to 55%; background and marker opacity remain independent.
+- Source edits refresh on the next animation frame. Actual CodeMirror fold ranges hide folded lines.
+
+## Install with BRAT
+
+Use `minhtritran/Markdown-Minimap` as the beta plugin repository after the release assets are published.
+The plugin ID remains `markdown-minimap`: this fork replaces the original, rather than running alongside it.
+Back up `.obsidian/plugins/markdown-minimap/data.json` before replacing an existing installation if you want to preserve its settings.
+Remove earlier minimap CSS overrides for fixed widths, padding, line heights or opacity before testing this version.
+
+## Verification and limits
+
+`npm ci && npm test && npm run build` runs the regression tests, TypeScript checks and release-file validation.
+Tests cover line mapping in both directions, wrapped lines, changing editor height estimates, folds, click/drag navigation, scroll endpoints and reserved-width calculations.
+`node tests/layout-fixture.mjs` writes `/tmp/minimap-layout.html`, a browser fixture for resize, tab and wrapping checks. It uses representative editor markup, not Obsidian itself.
+
+This release has **not been visually verified inside Obsidian**. Source mode still uses a separate text renderer, with Markdown/Prism highlighting; it is not a pixel-for-pixel clone of CodeMirror. Custom themes, hanging list indentation, inline fold replacements and third-party editor decorations may differ. Live Preview and Reading mode retain the upstream renderer. Very large notes still create one DOM row per source line.
+
+Before relying on it, check a long note in Source mode: scroll through new sections and pause; click text in the middle/bottom of the minimap; drag its marker; fold/unfold headings and lists; resize the pane; switch modes; and toggle the plugin off/on to verify spacing cleanup.
+
+## Upstream documentation
+
+The original project and attribution are retained below. References to upstream installation/release URLs below are for the original plugin.
+
+---
+
 # 🗺️ Markdown Minimap
 
 A minimap for your Markdown notes, inside the editor pane. Like the minimap in

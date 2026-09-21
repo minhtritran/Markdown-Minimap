@@ -70,6 +70,14 @@ export interface MirrorOptions {
     stripLeft: number;
     /** Whether to move the note's text clear of the minimap. */
     reserveSpace: boolean;
+    scale: number;
+    scrollbarGutter: number;
+}
+
+export function sourceRightPadding(available: number, textWidth: number, baseRight: number, scale: number, gutter: number): number {
+    const gap = 12 + gutter;
+    const fitted = Math.max(0, Math.min(textWidth, (available - gap) / (1 + scale)));
+    return Math.max(baseRight, fitted * scale + gap);
 }
 
 /** Width inside an element's own padding, which is where its text wraps. */
@@ -298,6 +306,24 @@ export function mirrorDocumentMetrics(
         readMode
     );
 
+    // Read the unreserved layout first so repeated resizes cannot compound
+    // our own padding. The strip and editor then share the available width:
+    // text + scale * text + gap + scrollbar gutter = pane width.
+    element.classList.remove("minimap-source-reserved");
+    element.style.removeProperty("--minimap-editor-padding-right");
+    if (rawSourceMode) {
+        applyContentShift(element, scroller, sizer, 0);
+        if (options.reserveSpace && scroller && scroller.clientWidth > 0) {
+            const style = computedStyle(scroller);
+            const baseRight = pixels(style?.paddingRight);
+            const width = measureTextWidth(element, false, sizer);
+            const available = scroller.clientWidth - pixels(style?.paddingLeft);
+            const right = sourceRightPadding(available, width, baseRight, options.scale, options.scrollbarGutter);
+            element.style.setProperty("--minimap-editor-padding-right", `${right}px`);
+            element.classList.add("minimap-source-reserved");
+        }
+    }
+
     const textWidth = measureTextWidth(element, readMode, sizer);
     // A hidden pane measures 0; keep the last good width.
     if (textWidth > 0) {
@@ -336,7 +362,7 @@ export function mirrorDocumentMetrics(
     // from. The note then painted unshifted on the way back and slid into place
     // once the measurement landed, which is what the shift looked like moving.
     // Treated as unmeasurable instead, the last shift simply stands.
-    if (options.stripLeft > 0 || !options.reserveSpace) {
+    if (!rawSourceMode && (options.stripLeft > 0 || !options.reserveSpace)) {
         const shift = options.reserveSpace
             ? reserveShift(scroller, textWidth, options.stripLeft)
             : 0;
@@ -357,6 +383,16 @@ export function mirrorDocumentMetrics(
     content.style.fontFamily = rawSourceMode
         ? textStyle?.fontFamily ?? ""
         : "";
+    content.style.tabSize = rawSourceMode ? textStyle?.tabSize ?? "4" : "";
+    content.style.letterSpacing = rawSourceMode ? textStyle?.letterSpacing ?? "" : "";
+    const line = rawSourceMode ? element.querySelector<HTMLElement>(
+        ".markdown-source-view .cm-line:not(.HyperMD-codeblock)"
+    ) : null;
+    const lineStyle = computedStyle(line) ?? textStyle;
+    for (const property of ["white-space", "overflow-wrap", "word-break"] as const) {
+        const value = rawSourceMode ? lineStyle?.getPropertyValue(property) : "";
+        container.style.setProperty(`--minimap-source-${property}`, value || "initial");
+    }
 }
 
 /**

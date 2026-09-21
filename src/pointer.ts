@@ -69,6 +69,7 @@ export class MinimapPointer {
     };
 
     private onMouseDown = (event: MouseEvent) => {
+        if (event.button !== 0) return;
         event.preventDefault();
         const slider = this.host.slider;
         const onThumb = this.isInsideSlider(event.clientY);
@@ -89,6 +90,12 @@ export class MinimapPointer {
             // A click on the track does move the view, to that position.
             this.grabFraction = 0;
             this.scrollToClientY(event.clientY);
+            // Once a track click navigates, subsequent movement drags the
+            // marker. Repeatedly targeting the panning document would creep.
+            this.dragMode = "thumb";
+            const rect = slider?.getBoundingClientRect();
+            this.grabFraction = rect && rect.height > 0
+                ? clamp((event.clientY - rect.top) / rect.height, 0, 1) : 0;
         }
 
         activeDocument.addEventListener("mousemove", this.onMouseMove);
@@ -233,10 +240,9 @@ export class MinimapPointer {
 
     /** Clicking the panel goes to the position under the pointer. */
     private documentScrollTop(localY: number, metrics: ScrollMetrics) {
-        return this.solveScrollTop(
-            localY,
-            this.host.centerOnClick ? 0.5 : 0,
-            metrics
-        );
+        // A track click targets the text currently under the pointer, not the
+        // future thumb position after the minimap has panned.
+        const target = this.mappedTopToScrollTop(localY + metrics.minimapScrollOffset, metrics);
+        return target - (this.host.centerOnClick ? metrics.clientHeight / 2 : 0);
     }
 }

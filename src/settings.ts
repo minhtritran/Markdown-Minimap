@@ -5,6 +5,7 @@ export interface MarkdownMinimapSettings {
     enabledByDefault: boolean;
     scale: number;
     minimapOpacity: number;
+    textOpacity: number;
     sliderOpacity: number;
     sliderIdleOpacity: number;
     topOffset: number;
@@ -20,6 +21,7 @@ export function getDefaultSettings(this: void): MarkdownMinimapSettings {
         enabledByDefault: true,
         scale: 0.1,
         minimapOpacity: 0.3,
+        textOpacity: 0.55,
         sliderOpacity: 0.3,
         // The idle state used to be derived as three tenths of the hover one;
         // this is that same value, so the default look is unchanged.
@@ -136,6 +138,12 @@ export class MinimapSettingTab extends PluginSettingTab {
             [0.05, 1, 0.01]
         );
         this.addSlider(
+            "Text opacity",
+            "Dim the minimap text independently of its background and viewport marker",
+            "textOpacity",
+            [0.1, 1, 0.05]
+        );
+        this.addSlider(
             "Slider opacity",
             "Slider opacity while hovering the minimap (0.05 - 1) - it strengthens further while dragging",
             "sliderOpacity",
@@ -173,7 +181,7 @@ export class MinimapSettingTab extends PluginSettingTab {
         );
         this.addToggle(
             "Make room for the minimap",
-            "Move the note's text so the space either side of it stays even once the minimap has taken its strip. Uses the file margin as well as the readable line length margin, and never moves the text past the pane's left edge",
+            "In Source mode, reserve only the space needed by the minimap and a small gap. Other modes shift the text into the available margin",
             "reserveSpace"
         );
         this.addToggle(

@@ -7,6 +7,7 @@ import {
 } from "./settings";
 import type { MarkdownMinimapSettings } from "./settings";
 import { sleep, throttle } from "./utils";
+import { EditorView } from "@codemirror/view";
 
 /**
  * Where the per-device switch is kept. Obsidian scopes local storage to the
@@ -26,6 +27,14 @@ export default class NoteMinimap extends Plugin {
     deviceDisabled = false;
 
     async onload() {
+        this.registerEditorExtension(EditorView.updateListener.of((update) => {
+            if (!update.docChanged) return;
+            for (const note of this.minimapInstances.values()) {
+                if (note.isRawSourceMode() && note.sourceView.contains(update.view.dom)) {
+                    note.scheduleSourceRender();
+                }
+            }
+        }));
         // Handle resize. The window sends these in bursts while an edge is
         // dragged, so they are throttled — but only far enough to coalesce a
         // burst. At a second the panel stayed sized for the old pane for well
@@ -80,7 +89,7 @@ export default class NoteMinimap extends Plugin {
         // Update previews as needed
         this.debouncedUpdateMinimap = debounce(
             () => {
-                if (this.activeNoteView)
+                if (this.activeNoteView && !this.minimapInstances.get(this.activeNoteView.contentEl)?.isRawSourceMode())
                     void this.updateViewMinimap(this.activeNoteView);
             },
             700,
