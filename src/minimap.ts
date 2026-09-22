@@ -318,7 +318,7 @@ export class Minimap implements PointerHost {
         this.anchors.clear();
         this.sourceMap.clear();
         this.element.classList.remove("source-minimap-source-reserved");
-        this.element.style.removeProperty("--source-minimap-editor-padding-right");
+        this.element.style.removeProperty("--source-minimap-reserved-width");
     }
 
     // --- settings --------------------------------------------------------

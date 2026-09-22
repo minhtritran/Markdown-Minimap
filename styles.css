@@ -174,8 +174,13 @@
 }
 
 .source-minimap-source-reserved:not(.source-minimap-disabled)
-    .markdown-source-view.mod-cm6 .cm-scroller {
-    padding-right: var(--source-minimap-editor-padding-right);
+    > .markdown-source-view.mod-cm6 {
+    /* Reserve outside CodeMirror so its flex sizer cannot consume the strip. */
+    box-sizing: border-box;
+    width: max(0px, calc(100% - var(--source-minimap-reserved-width)));
+    max-width: max(0px, calc(100% - var(--source-minimap-reserved-width)));
+    min-width: 0;
+    overflow-x: clip;
 }
 
 /* Frontmatter keeps the body's size and line height in Source mode; only the

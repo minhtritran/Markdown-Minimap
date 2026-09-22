@@ -74,10 +74,10 @@ export interface MirrorOptions {
     scrollbarGutter: number;
 }
 
-export function sourceRightPadding(available: number, textWidth: number, baseRight: number, scale: number, gutter: number): number {
+export function sourceReservedWidth(available: number, textWidth: number, scale: number, gutter: number): number {
     const gap = 12 + gutter;
     const fitted = Math.max(0, Math.min(textWidth, (available - gap) / (1 + scale)));
-    return Math.max(baseRight, fitted * scale + gap);
+    return Math.ceil(fitted * scale + gap);
 }
 
 /** Width inside an element's own padding, which is where its text wraps. */
@@ -306,21 +306,31 @@ export function mirrorDocumentMetrics(
         readMode
     );
 
-    // Read the unreserved layout first so repeated resizes cannot compound
-    // our own padding. The strip and editor then share the available width:
-    // text + scale * text + gap + scrollbar gutter = pane width.
+    // Reserve a sibling strip by narrowing the source view itself. Padding
+    // inside CM's flex scroller does not constrain its sizer in every theme.
+    // Preserve a hidden pane's last reserve until it can be measured again.
+    if (rawSourceMode && options.reserveSpace && (!scroller || scroller.clientWidth <= 0)) return;
     element.classList.remove("source-minimap-source-reserved");
-    element.style.removeProperty("--source-minimap-editor-padding-right");
+    element.style.removeProperty("--source-minimap-reserved-width");
     if (rawSourceMode) {
         applyContentShift(element, scroller, sizer, 0);
         if (options.reserveSpace && scroller && scroller.clientWidth > 0) {
             const style = computedStyle(scroller);
-            const baseRight = pixels(style?.paddingRight);
             const width = measureTextWidth(element, false, sizer);
-            const available = scroller.clientWidth - pixels(style?.paddingLeft);
-            const right = sourceRightPadding(available, width, baseRight, options.scale, options.scrollbarGutter);
-            element.style.setProperty("--source-minimap-editor-padding-right", `${right}px`);
+            const gutters = scroller.querySelector<HTMLElement>(".cm-gutters")?.offsetWidth ?? 0;
+            const available = scroller.clientWidth - pixels(style?.paddingLeft)
+                - pixels(style?.paddingRight) - gutters;
+            let reserve = sourceReservedWidth(available, width, options.scale, options.scrollbarGutter);
+            element.style.setProperty("--source-minimap-reserved-width", `${reserve}px`);
             element.classList.add("source-minimap-source-reserved");
+            // A theme may size its text column differently from the estimate.
+            // Guarantee room for the actual strip after applying the reserve.
+            const actual = measureTextWidth(element, false, sizer) * options.scale
+                + options.scrollbarGutter + 12;
+            if (actual > reserve) {
+                reserve = Math.ceil(actual);
+                element.style.setProperty("--source-minimap-reserved-width", `${reserve}px`);
+            }
         }
     }
 

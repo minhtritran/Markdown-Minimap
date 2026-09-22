@@ -1,13 +1,9 @@
-Source Minimap — a separately installable Source-mode fork of Markdown Minimap 2.6.0.
+Source Minimap 2.6.2 — editor/minimap overlap fix
 
-- Keep the full-note minimap layout stable while CodeMirror measures newly visited lines.
-- Map navigation by source line, including notes without headings and wrapped lines.
-- Fix clicks on a panned minimap to target the text under the pointer.
-- Reserve space from the scaled minimap width rather than requiring a fixed CSS gutter.
-- Match editor tabs, whitespace, wrapping and letter spacing.
-- Add independent Text opacity (55% default).
-- Refresh source edits on the next frame and mirror CodeMirror fold ranges.
+- Reserve a separate strip outside the Source-mode editor instead of padding CodeMirror's flex scroller. The editor can no longer lay out text across the minimap strip.
+- Calculate the strip from the minimap scale and actual text width, with a 12px gap. No fixed 190px gutter.
+- Recalculate on resize and remove the reserve when switching modes or disabling the plugin. Hidden panes retain their last measured reserve.
 
-Validation: eight regression tests, TypeScript check and production build passed. Not visually verified inside Obsidian. The separate renderer can still differ with custom themes, hanging indents, inline fold replacements and third-party editor decorations; Live Preview and Reading mode keep the upstream renderer.
+Validation: eight regression tests, TypeScript and production build. The reported Obsidian/theme combination still needs an in-app visual check.
 
-BRAT repository: minhtritran/Markdown-Minimap. Its plugin ID is source-minimap, so the original Markdown Minimap and its settings remain untouched. Disable the original while using this fork to avoid overlapping minimaps. The fork uses its own CSS namespace and device preference key.
+Update Source Minimap through BRAT. Keep Make room for the minimap enabled. This remains separate from the original Markdown Minimap plugin and settings.

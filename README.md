@@ -5,7 +5,7 @@ Source-mode improvements over Nymbo/Markdown-Minimap 2.6.0:
 - Stable full-note layout: scrolling no longer replaces minimap row heights with CodeMirror's provisional measurements.
 - Navigation maps every source line, including notes without headings and wrapped lines.
 - Track clicks target the text currently under the pointer. Subsequent dragging holds the viewport marker.
-- Source-mode spacing follows the scaled minimap width; no fixed 190px CSS gutter.
+- Source-mode spacing narrows the editor pane to reserve a separate minimap strip. This fixes the 2.6.1 overlap caused by padding CodeMirror's scroller; no fixed 190px CSS gutter.
 - Tabs, whitespace, wrapping and letter spacing follow the editor's computed styles.
 - A separate **Text opacity** setting defaults to 55%; background and marker opacity remain independent.
 - Source edits refresh on the next animation frame. Actual CodeMirror fold ranges hide folded lines.

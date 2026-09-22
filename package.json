@@ -1,6 +1,6 @@
 {
   "name": "source-minimap",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "description": "Add a minimap to your Markdown notes.",
   "author": "Nymbo",
   "main": "main.js",
