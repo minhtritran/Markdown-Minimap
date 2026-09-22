@@ -12,7 +12,6 @@ export interface MarkdownMinimapSettings {
     bottomOffset: number;
     scrollbarGutter: number;
     minViewportHeight: number;
-    reserveSpace: boolean;
     centerOnClick: boolean;
 }
 
@@ -30,9 +29,6 @@ export function getDefaultSettings(this: void): MarkdownMinimapSettings {
         bottomOffset: 0,
         scrollbarGutter: 14,
         minViewportHeight: 24,
-        // On by default: the minimap draws over the note, so letting the text
-        // run underneath it is the wrong thing to do unasked.
-        reserveSpace: true,
         centerOnClick: true,
     };
 }
@@ -41,9 +37,11 @@ export function isSettingsObject(
     this: void,
     value: unknown
 ): Partial<MarkdownMinimapSettings> {
-    return value && typeof value === "object"
-        ? (value as Partial<MarkdownMinimapSettings>)
-        : {};
+    if (!value || typeof value !== "object") return {};
+    const settings = { ...value } as Partial<MarkdownMinimapSettings> & { reserveSpace?: unknown };
+    // Ignore the removed setting even if an older data.json enabled it.
+    delete settings.reserveSpace;
+    return settings;
 }
 
 export class MinimapSettingTab extends PluginSettingTab {
@@ -178,11 +176,6 @@ export class MinimapSettingTab extends PluginSettingTab {
             "Minimum height for the visible viewport highlight (pixels)",
             "minViewportHeight",
             [8, 80, 1]
-        );
-        this.addToggle(
-            "Make room for the minimap",
-            "In Source mode, reserve only the space needed by the minimap and a small gap. Other modes shift the text into the available margin",
-            "reserveSpace"
         );
         this.addToggle(
             "Center on click",

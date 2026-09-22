@@ -5,7 +5,7 @@ Source-mode improvements over Nymbo/Markdown-Minimap 2.6.0:
 - Stable full-note layout: scrolling no longer replaces minimap row heights with CodeMirror's provisional measurements.
 - Navigation maps every source line, including notes without headings and wrapped lines.
 - Track clicks target the text currently under the pointer. Subsequent dragging holds the viewport marker.
-- Source-mode spacing narrows the editor pane to reserve a separate minimap strip. This fixes the 2.6.1 overlap caused by padding CodeMirror's scroller; no fixed 190px CSS gutter.
+- Automatic right padding uses the measured minimap strip and the working `.cm-scroller { padding-right: …; box-sizing: border-box; }` rule. No pane-width, left-margin or clipping changes. **Make room for the minimap** is removed; old values are ignored. No new setting is needed.
 - Tabs, whitespace, wrapping and letter spacing follow the editor's computed styles.
 - A separate **Text opacity** setting defaults to 55%; background and marker opacity remain independent.
 - Source edits refresh on the next animation frame. Actual CodeMirror fold ranges hide folded lines.
@@ -20,16 +20,16 @@ Remove earlier minimap CSS overrides for fixed widths, padding, line heights or 
 ## Verification and limits
 
 `npm ci && npm test && npm run build` runs the regression tests, TypeScript checks and release-file validation.
-Tests cover line mapping in both directions, wrapped lines, changing editor height estimates, folds, click/drag navigation, scroll endpoints and reserved-width calculations.
+Tests cover line mapping in both directions, wrapped lines, changing editor height estimates, folds, click/drag navigation and scroll endpoints.
 `node tests/layout-fixture.mjs` writes `/tmp/minimap-layout.html`, a browser fixture for resize, tab and wrapping checks. It uses representative editor markup, not Obsidian itself.
 
 This release has **not been visually verified inside Obsidian**. Source mode still uses a separate text renderer, with Markdown/Prism highlighting; it is not a pixel-for-pixel clone of CodeMirror. Custom themes, hanging list indentation, inline fold replacements and third-party editor decorations may differ. Live Preview and Reading mode retain the upstream renderer. Very large notes still create one DOM row per source line.
 
-Before relying on it, check a long note in Source mode: scroll through new sections and pause; click text in the middle/bottom of the minimap; drag its marker; fold/unfold headings and lists; resize the pane; switch modes; and toggle the plugin off/on to verify spacing cleanup.
+Before relying on it, check a long note in Source mode: scroll through new sections and pause; click text in the middle/bottom of the minimap; drag its marker; fold/unfold headings and lists; resize the pane; switch modes; and toggle the plugin off/on to verify the editor layout stays unchanged.
 
 ## Upstream documentation
 
-The original project and attribution are retained below. References to upstream installation/release URLs below are for the original plugin.
+The original project and attribution are retained below. References to upstream installation/release URLs and the old Make room setting below describe the original plugin, not this fork with automatic scroller padding.
 
 ---
 

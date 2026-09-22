@@ -1,9 +1,10 @@
-Source Minimap 2.6.2 — editor/minimap overlap fix
+Source Minimap 2.6.3 — automatic right padding without pane resizing
 
-- Reserve a separate strip outside the Source-mode editor instead of padding CodeMirror's flex scroller. The editor can no longer lay out text across the minimap strip.
-- Calculate the strip from the minimap scale and actual text width, with a 12px gap. No fixed 190px gutter.
-- Recalculate on resize and remove the reserve when switching modes or disabling the plugin. Hidden panes retain their last measured reserve.
+- Remove Make room for the minimap and the source-view width, margin-shifting and clipping rules that affected the left gutter.
+- Use the working .cm-scroller padding-right and box-sizing: border-box approach instead.
+- Calculate the required padding from the minimap's rendered left edge with a 12px gap, preserving larger theme padding. Recalculate when the pane or minimap scale changes.
+- No new setting is needed. Ignore the old reserveSpace value and clean up obsolete layout markers.
 
-Validation: eight regression tests, TypeScript and production build. The reported Obsidian/theme combination still needs an in-app visual check.
+Eight regression tests and the production build pass. In-app visual confirmation in the user's Obsidian theme remains necessary.
 
-Update Source Minimap through BRAT. Keep Make room for the minimap enabled. This remains separate from the original Markdown Minimap plugin and settings.
+Update Source Minimap through BRAT and reload the plugin. Its separate plugin ID remains source-minimap.

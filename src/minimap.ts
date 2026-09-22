@@ -59,7 +59,6 @@ export class Minimap implements PointerHost {
     bottomOffset = 0;
     scrollbarGutter = 14;
     minViewportHeight = 24;
-    reserveSpace = false;
     centerOnClick = true;
     backgroundColor = "";
     renderVersion = 0;
@@ -122,6 +121,11 @@ export class Minimap implements PointerHost {
     // --- lifecycle -------------------------------------------------------
 
     setupElements() {
+        this.element.classList.remove("source-minimap-source-reserved", "source-minimap-content-shifted");
+        for (const property of ["--source-minimap-reserved-width", "--source-minimap-editor-padding-right",
+            "--source-minimap-content-shift", "--source-minimap-sizer-margin-left", "--source-minimap-sizer-margin-right"]) {
+            this.element.style.removeProperty(property);
+        }
         this.element
             .querySelectorAll(
                 ".source-minimap-container, .source-minimap-viewport, .source-minimap-content, .source-minimap-slider, .source-minimap-hitbox"
@@ -290,6 +294,8 @@ export class Minimap implements PointerHost {
     }
 
     destroy() {
+        this.element.classList.remove("source-minimap-auto-padding");
+        this.element.style.removeProperty("--source-minimap-editor-right-padding");
         this.renderVersion++; // invalidate any in-flight render
         window.clearTimeout(this.resizeTimer);
         this.element.ownerDocument.defaultView?.cancelAnimationFrame(this.sourceRenderFrame);
@@ -333,7 +339,6 @@ export class Minimap implements PointerHost {
         this.bottomOffset = settings.bottomOffset;
         this.scrollbarGutter = settings.scrollbarGutter;
         this.minViewportHeight = settings.minViewportHeight;
-        this.reserveSpace = settings.reserveSpace;
         this.centerOnClick = settings.centerOnClick;
 
         this.backgroundColor = toRGBAAlpha(
@@ -375,20 +380,7 @@ export class Minimap implements PointerHost {
         }
         if (this.content)
             this.content.style.backgroundColor = this.backgroundColor;
-        // The reserve is measured, so it is recomputed with the rest of the
-        // document metrics rather than written directly from the setting.
         this.syncDocumentMetrics();
-    }
-
-    /**
-     * Page-space left edge of the visible minimap strip. Measured from the
-     * hitbox, which is the strip: deriving it from the doc width and scale
-     * would ignore that the container spans the whole view rather than the
-     * scroller's content box.
-     */
-    getStripLeft() {
-        const rect = this.hitbox?.getBoundingClientRect();
-        return rect && rect.width > 0 ? rect.left : 0;
     }
 
     // --- mode and scroller ------------------------------------------------
@@ -467,10 +459,7 @@ export class Minimap implements PointerHost {
             content: this.content,
             readMode: this.isReadModeActive(),
             rawSourceMode: this.isRawSourceMode(),
-            stripLeft: this.getStripLeft(),
-            reserveSpace: this.reserveSpace,
-            scale: this.scale,
-            scrollbarGutter: this.scrollbarGutter,
+            hitbox: this.hitbox,
         });
         this.syncCodeBlockMetrics();
     }

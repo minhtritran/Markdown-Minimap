@@ -8,9 +8,6 @@ import { clamp, computedStyle, pixels } from "./utils";
  * live editor rather than assumed.
  */
 
-/** Marks the view as having its text moved clear of the minimap. */
-const SHIFTED_CLASS = "source-minimap-content-shifted";
-
 export interface DocumentElements {
     scroller: HTMLElement | null;
     sizer: HTMLElement | null;
@@ -66,18 +63,12 @@ export interface MirrorOptions {
     content: HTMLElement;
     readMode: boolean;
     rawSourceMode: boolean;
-    /** Page-space left edge of the visible minimap strip. */
-    stripLeft: number;
-    /** Whether to move the note's text clear of the minimap. */
-    reserveSpace: boolean;
-    scale: number;
-    scrollbarGutter: number;
+    hitbox: HTMLElement | null;
 }
 
-export function sourceReservedWidth(available: number, textWidth: number, scale: number, gutter: number): number {
-    const gap = 12 + gutter;
-    const fitted = Math.max(0, Math.min(textWidth, (available - gap) / (1 + scale)));
-    return Math.ceil(fitted * scale + gap);
+/** Pixels needed to keep the editor inside the measured strip boundary. */
+export function requiredEditorPadding(innerRight: number, stripLeft: number, themePadding: number): number {
+    return Math.ceil(Math.max(themePadding, innerRight - stripLeft + 12));
 }
 
 /** Width inside an element's own padding, which is where its text wraps. */
@@ -134,133 +125,6 @@ function measureTextWidth(
 }
 
 /**
- * How far the note's text should move so the space either side of it looks
- * even once the minimap has taken its strip.
- *
- * Both gaps are measured to the pane's own edges — the left one from the
- * scroller's border, the right one to the strip — and the shift is half their
- * difference, which is what makes them equal. Measuring the left gap from the
- * content box instead leaves the file margin out of the comparison, and the
- * file margin is usually the larger half of it: the text then reads as sitting
- * too far right even though the arithmetic balanced.
- *
- * That margin is also room the text can move into. Restricting the shift to
- * the centring margin alone left it pinned at zero whenever the line was wide
- * enough to fill the content box, which is the common case on a narrow pane at
- * high zoom, and the minimap simply covered the last few characters.
- *
- * The strip's position is measured rather than derived from its width: the
- * minimap container spans the whole view, while the text sits inside the
- * scroller's padding, so the two right edges do not coincide.
- *
- * Clamped to the gap that actually exists, so the text can never be pushed off
- * the pane's left edge and clipped.
- */
-function reserveShift(
-    this: void,
-    scroller: HTMLElement | null,
-    textWidth: number,
-    stripLeft: number
-): number {
-    if (!scroller || textWidth <= 0 || stripLeft <= 0) return 0;
-    const style = computedStyle(scroller);
-    const rect = scroller.getBoundingClientRect();
-    const paddingLeft = pixels(style?.paddingLeft);
-    const paddingRight = pixels(style?.paddingRight);
-    // clientWidth excludes the native scrollbar, the bounding rect does not.
-    // Measuring the content edge from the rect would place it a scrollbar's
-    // width too far right and skew the shift by half of that.
-    const innerRight = rect.left + scroller.clientWidth;
-    const available = scroller.clientWidth - paddingLeft - paddingRight;
-    // Whatever readable line length leaves over; zero once the text is wide
-    // enough to fill the content box.
-    const centring = Math.max(0, (available - textWidth) / 2);
-    const leftGap = paddingLeft + centring;
-    const rightGap = stripLeft - (innerRight - paddingRight - centring);
-    return clamp((leftGap - rightGap) / 2, 0, leftGap);
-}
-
-/**
- * The margin the note's sizer centres itself with when left alone: half the
- * room left over once its own width is taken out of the space inside the
- * scroller's padding.
- *
- * Read from the sizer's own box rather than from the text width, so a line's
- * own inset does not creep into it — but read with the shift lifted, which is
- * the part that matters. The two margins written below are equal and opposite,
- * so they leave the sizer's width alone only while that width is the theme's
- * readable line length. Once the pane is narrow enough that the margins are
- * what the width is subtracted from, measuring the shifted sizer feeds this
- * number its own previous answer: the margins reproduce themselves exactly, so
- * a text column squeezed by one bad measurement mid-resize stays squeezed
- * through every later resize and only a refresh clears it. Issue #12.
- *
- * Lifting the class and restoring it without yielding costs one synchronous
- * layout and paints nothing in between.
- */
-function baseSizerMargin(
-    this: void,
-    element: HTMLElement,
-    scroller: HTMLElement | null,
-    sizer: HTMLElement | null
-): number {
-    if (!scroller || !sizer) return 0;
-    const style = computedStyle(scroller);
-    const available =
-        scroller.clientWidth -
-        pixels(style?.paddingLeft) -
-        pixels(style?.paddingRight);
-    if (available <= 0) return 0;
-
-    const shifted = element.classList.contains(SHIFTED_CLASS);
-    if (shifted) element.classList.remove(SHIFTED_CLASS);
-    const width = sizer.getBoundingClientRect().width;
-    if (shifted) element.classList.add(SHIFTED_CLASS);
-
-    if (width <= 0) return 0;
-    return Math.max(0, (available - width) / 2);
-}
-
-/**
- * Move the note's text clear of the minimap, by margin rather than by
- * transform.
- *
- * A transform on the sizer makes it the containing block for everything
- * absolutely positioned inside it, and Obsidian's find-in-note overlay places
- * its match boxes in coordinates measured against the scroller. In Reading view
- * that put every highlight a centring margin away from the text it was marking.
- * Equal and opposite margins move the same box the same distance without
- * claiming its descendants' coordinate space, and leave the sizer's width
- * untouched, so nothing rewraps either.
- */
-function applyContentShift(
-    this: void,
-    element: HTMLElement,
-    scroller: HTMLElement | null,
-    sizer: HTMLElement | null,
-    shift: number
-): void {
-    if (shift <= 0) {
-        element.style.removeProperty("--source-minimap-content-shift");
-        element.style.removeProperty("--source-minimap-sizer-margin-left");
-        element.style.removeProperty("--source-minimap-sizer-margin-right");
-        element.classList.remove(SHIFTED_CLASS);
-        return;
-    }
-    const base = baseSizerMargin(element, scroller, sizer);
-    element.style.setProperty("--source-minimap-content-shift", `${shift}px`);
-    element.style.setProperty(
-        "--source-minimap-sizer-margin-left",
-        `${base - shift}px`
-    );
-    element.style.setProperty(
-        "--source-minimap-sizer-margin-right",
-        `${base + shift}px`
-    );
-    element.classList.add(SHIFTED_CLASS);
-}
-
-/**
  * The panel's counterpart to the contentless space below the note's last line —
  * the file margin plus the room Obsidian leaves for scrolling past the end.
  *
@@ -306,32 +170,34 @@ export function mirrorDocumentMetrics(
         readMode
     );
 
-    // Reserve a sibling strip by narrowing the source view itself. Padding
-    // inside CM's flex scroller does not constrain its sizer in every theme.
-    // Preserve a hidden pane's last reserve until it can be measured again.
-    if (rawSourceMode && options.reserveSpace && (!scroller || scroller.clientWidth <= 0)) return;
-    element.classList.remove("source-minimap-source-reserved");
-    element.style.removeProperty("--source-minimap-reserved-width");
-    if (rawSourceMode) {
-        applyContentShift(element, scroller, sizer, 0);
-        if (options.reserveSpace && scroller && scroller.clientWidth > 0) {
-            const style = computedStyle(scroller);
+    // Match the user's working scroller padding + border-box rule. Never
+    // resize the source-view wrapper, shift margins, or clip the gutter.
+    if (!readMode && scroller && scroller.clientWidth === 0) return;
+    element.classList.remove("source-minimap-auto-padding");
+    element.style.removeProperty("--source-minimap-editor-right-padding");
+    if (!readMode && scroller && options.hitbox) {
+        const themePadding = pixels(computedStyle(scroller)?.paddingRight);
+        const measureStrip = () => {
             const width = measureTextWidth(element, false, sizer);
-            const gutters = scroller.querySelector<HTMLElement>(".cm-gutters")?.offsetWidth ?? 0;
-            const available = scroller.clientWidth - pixels(style?.paddingLeft)
-                - pixels(style?.paddingRight) - gutters;
-            let reserve = sourceReservedWidth(available, width, options.scale, options.scrollbarGutter);
-            element.style.setProperty("--source-minimap-reserved-width", `${reserve}px`);
-            element.classList.add("source-minimap-source-reserved");
-            // A theme may size its text column differently from the estimate.
-            // Guarantee room for the actual strip after applying the reserve.
-            const actual = measureTextWidth(element, false, sizer) * options.scale
-                + options.scrollbarGutter + 12;
-            if (actual > reserve) {
-                reserve = Math.ceil(actual);
-                element.style.setProperty("--source-minimap-reserved-width", `${reserve}px`);
-            }
+            if (width > 0) container.style.setProperty("--source-minimap-doc-width", `${width}px`);
+            const strip = options.hitbox!.getBoundingClientRect();
+            return strip.width > 0 ? requiredEditorPadding(
+                scroller.getBoundingClientRect().left + scroller.clientWidth,
+                strip.left, themePadding
+            ) : themePadding;
+        };
+        let padding = measureStrip();
+        element.classList.add("source-minimap-auto-padding");
+        // Padding changes wrapping width, which changes the scaled strip.
+        // A bounded feedback pass avoids retaining the full unpadded width.
+        for (let pass = 0; pass < 4; pass++) {
+            element.style.setProperty("--source-minimap-editor-right-padding", `${padding}px`);
+            const next = measureStrip();
+            if (next === padding) break;
+            // End on the conservative side of any rounding oscillation.
+            padding = pass === 3 ? Math.max(padding, next) : next;
         }
+        element.style.setProperty("--source-minimap-editor-right-padding", `${padding}px`);
     }
 
     const textWidth = measureTextWidth(element, readMode, sizer);
@@ -365,19 +231,6 @@ export function mirrorDocumentMetrics(
         "--source-minimap-doc-trailing",
         `${scaleTrailingSpace(content, scroller, editorTrailing)}px`
     );
-
-    // Published on the view element, not the panel, so it survives re-renders.
-    // A background tab measures every rect at 0, which reads as "no strip to
-    // move clear of" and would retract the shift from every tab navigated away
-    // from. The note then painted unshifted on the way back and slid into place
-    // once the measurement landed, which is what the shift looked like moving.
-    // Treated as unmeasurable instead, the last shift simply stands.
-    if (!rawSourceMode && (options.stripLeft > 0 || !options.reserveSpace)) {
-        const shift = options.reserveSpace
-            ? reserveShift(scroller, textWidth, options.stripLeft)
-            : 0;
-        applyContentShift(element, scroller, sizer, shift);
-    }
 
     // Themes commonly scope line height to selectors the panel does not match,
     // so mirror the resolved values instead of relying on class inheritance.

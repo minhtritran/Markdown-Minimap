@@ -3,8 +3,8 @@ import { build } from 'esbuild';
 
 // Bundle the shipped modules, not a second implementation of the math.
 const bundle = await build({stdin:{contents:`
+export { requiredEditorPadding } from './src/document-metrics';
 export { SourceMap } from './src/source-map';
-export { sourceReservedWidth } from './src/document-metrics';
 export { computeScrollMetrics } from './src/scroll-model';
 export { MinimapPointer } from './src/pointer';
 export { applySourceFolds } from './src/source-view';
@@ -13,7 +13,7 @@ export { foldEffect, codeFolding } from '@codemirror/language';
 `,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',plugins:[{
 name:'obsidian-test-stub',setup(b){b.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class Component {}; export const MarkdownRenderer = {};'}));}
 }]});
-const {sourceReservedWidth,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const {requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const near=(a,b)=>assert.ok(Math.abs(a-b)<0.001,`${a} != ${b}`);
 let passed=0;
 function test(name,fn){fn();passed++;console.log('PASS',name);}
@@ -70,15 +70,10 @@ test('scroll endpoints stay within the track',()=>{
   near(m.mappedTop-m.minimapScrollOffset,scrollTop===0?0:m.activeHeight-m.sliderHeight);
  }
 });
-test('outer reserve fits a full-width editor and a readable-width editor',()=>{
- for(const available of [248,448,828,1500]) for(const scale of [.05,.1,.3]){
-  for(const baseText of [available,Math.min(700,available)]){
-   const reserve=sourceReservedWidth(available,baseText,scale,14);
-   const textWidth=Math.min(baseText,available-reserve);
-   assert.ok(reserve>=textWidth*scale+26-0.001);
-   assert.ok(reserve<available);
-  }
- }
- assert.equal(sourceReservedWidth(828,828,.1,14),99);
+test('automatic right padding uses the rendered strip boundary and keeps theme minimum',()=>{
+ assert.equal(requiredEditorPadding(1730,1602,24),140);
+ assert.equal(requiredEditorPadding(1000,914,24),98);
+ assert.equal(requiredEditorPadding(1000,914,160),160);
+ assert.equal(requiredEditorPadding(1000,913.4,24),99);
 });
 console.log(`${passed} regression tests passed.`);

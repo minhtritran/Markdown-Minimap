@@ -12,11 +12,13 @@ const results=[];
 function run(){
  for(const width of [900,520,320,900]){
   pane.style.width=width+'px';
-  for(let i=0;i<3;i++) mirrorDocumentMetrics({element:pane,container,content,readMode:false,rawSourceMode:true,stripLeft:0,reserveSpace:true,scale:.1,scrollbarGutter:14});
+  const before=document.querySelector('.cm-content').getBoundingClientRect().toJSON();
+  for(let i=0;i<3;i++) mirrorDocumentMetrics({element:pane,container,content,readMode:false,rawSourceMode:true,hitbox:document.querySelector('.source-minimap-hitbox')});
   const a=[...document.querySelectorAll('.cm-line')], b=[...document.querySelectorAll('.source-minimap-source-line')];
   const mismatch=a.some((e,i)=>Math.abs(e.offsetHeight-b[i].offsetHeight)>1);
   const editorRight=a[0].getBoundingClientRect().right,stripLeft=document.querySelector('.source-minimap-hitbox').getBoundingClientRect().left;
-  const good=!mismatch&&editorRight+10<=stripLeft;
+  const after=document.querySelector('.cm-content').getBoundingClientRect();
+  const good=!mismatch&&before.x===after.x&&editorRight+10<=stripLeft;
   results.push({width,good,editorWidth:a[0].clientWidth,panelWidth:content.clientWidth,gap:stripLeft-editorRight,heights:a.map(e=>e.offsetHeight),panelHeights:b.map(e=>e.offsetHeight)});
  }
  document.querySelector('pre').textContent=JSON.stringify(results,null,2);

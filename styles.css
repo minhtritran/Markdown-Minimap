@@ -173,16 +173,6 @@
     display: none;
 }
 
-.source-minimap-source-reserved:not(.source-minimap-disabled)
-    > .markdown-source-view.mod-cm6 {
-    /* Reserve outside CodeMirror so its flex sizer cannot consume the strip. */
-    box-sizing: border-box;
-    width: max(0px, calc(100% - var(--source-minimap-reserved-width)));
-    max-width: max(0px, calc(100% - var(--source-minimap-reserved-width)));
-    min-width: 0;
-    overflow-x: clip;
-}
-
 /* Frontmatter keeps the body's size and line height in Source mode; only the
    family differs, so heights stay identical to the editor's. */
 .source-minimap-content-source .source-minimap-source-line.mod-frontmatter {
@@ -279,20 +269,10 @@
     display: none;
 }
 
-/* Optional breathing room between the note's text and the minimap.
-   Suggested by @2590812378 in issue #3.
-
-   Margins, not a transform: a transform makes the sizer the containing block
-   for every absolutely positioned descendant, and Obsidian's find-in-note
-   overlay positions its match boxes in coordinates measured against the
-   scroller. The two margins are equal and opposite, so the box moves without
-   its width changing and nothing rewraps. */
-.source-minimap-content-shifted:not(.source-minimap-disabled)
-    .markdown-source-view.mod-cm6
-    .cm-sizer,
-.source-minimap-content-shifted:not(.source-minimap-disabled)
-    .markdown-reading-view
-    .markdown-preview-sizer {
-    margin-left: var(--source-minimap-sizer-margin-left, auto);
-    margin-right: var(--source-minimap-sizer-margin-right, auto);
+/* Automatically measured equivalent of the working padding-right CSS snippet.
+   No source-view width, left margin, gutter or clipping changes. */
+.view-content.source-minimap-auto-padding:has(> .source-minimap-container):not(.source-minimap-disabled)
+    .markdown-source-view.mod-cm6 .cm-scroller {
+    padding-right: var(--source-minimap-editor-right-padding);
+    box-sizing: border-box;
 }
