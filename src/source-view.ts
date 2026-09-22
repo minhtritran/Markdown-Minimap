@@ -127,7 +127,26 @@ function appendToken(
  * colours in spans. Falls back to a single text node when there is nothing to
  * mark, which is most lines.
  */
-function fillLine(this: void, element: HTMLElement, text: string) {
+export function previewToken(name: string, text: string): string {
+    if (name === "embed") {
+        if (text.startsWith("!")) return text;
+        const target = text.slice(2, -2);
+        return target.includes("|") ? target.slice(target.indexOf("|") + 1) : target;
+    }
+    if (name === "link") {
+        return text.startsWith("!") ? text : text.slice(1, text.indexOf("]("));
+    }
+    if (["strong", "highlight", "strike"].includes(name)) return text.slice(2, -2);
+    if (["em", "code"].includes(name)) return text.slice(1, -1);
+    return text;
+}
+
+/** Keep the literal whitespace prefix; never feed tabbed prose to a block parser. */
+export function previewHeading(text: string): string {
+    return text.replace(/^( {0,3})#{1,6}[\t ]+/, "$1").replace(/[\t ]+#+[\t ]*$/, "");
+}
+
+function fillLine(this: void, element: HTMLElement, text: string, preview = false) {
     if (text.length === 0) {
         // An empty div collapses to nothing; a zero-width space keeps the line
         // box so blank lines occupy their line, as they do in Source.
@@ -147,7 +166,8 @@ function fillLine(this: void, element: HTMLElement, text: string) {
         appendToken(element, marker[1]);
         appendToken(
             element,
-            marker[2] + marker[3],
+            (preview && /^[-*+]$/.test(marker[2]) ? "•" : marker[2]) +
+                (preview ? marker[3].replace(/\[ \]/, "☐").replace(/\[[xX]\]/, "☑") : marker[3]),
             "source-minimap-source-marker"
         );
         rest = rest.slice(marker[0].length);
@@ -173,7 +193,7 @@ function fillLine(this: void, element: HTMLElement, text: string) {
                 token = token.slice(lead.length);
             }
         }
-        appendToken(element, token, name ? TOKEN_CLASS[name] : undefined);
+        appendToken(element, preview && name ? previewToken(name, token) : token, name ? TOKEN_CLASS[name] : undefined);
         index = match.index + match[0].length;
     }
     appendToken(element, rest.slice(index));
@@ -258,7 +278,9 @@ export interface SourceLineDom {
 
 export function buildSourceLineDom(
     this: void,
-    markdown: string
+    markdown: string,
+    livePreview = false,
+    activeLines: ReadonlySet<number> = new Set()
 ): SourceLineDom {
     const lines = classifySourceLines(markdown);
     const highlights = collectCodeHighlights(markdown.split(/\r?\n/));
@@ -294,7 +316,8 @@ export function buildSourceLineDom(
                     line.text.length > 0 ? line.text : "\u200B";
             }
         } else {
-            fillLine(element, line.text);
+            const preview = livePreview && !activeLines.has(index + 1);
+            fillLine(element, preview && line.kind === "heading" ? previewHeading(line.text) : line.text, preview);
         }
         elements.push(element);
         fragment.appendChild(element);

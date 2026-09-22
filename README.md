@@ -1,6 +1,8 @@
 # Source Minimap
 
-Source-mode improvements over Nymbo/Markdown-Minimap 2.6.0:
+Source and Live Preview improvements over Nymbo/Markdown-Minimap 2.6.0:
+
+- Live Preview preserves literal tabs, nested list depth and blank lines instead of collapsing them through the Reading view renderer. Common inline formatting hides its delimiters, except on active editor lines. Both editing modes use line-based navigation and actual editor folds.
 
 - Stable full-note layout: scrolling no longer replaces minimap row heights with CodeMirror's provisional measurements.
 - Navigation maps every source line, including notes without headings and wrapped lines.
@@ -23,7 +25,7 @@ Remove earlier minimap CSS overrides for fixed widths, padding, line heights or 
 Tests cover line mapping in both directions, wrapped lines, changing editor height estimates, folds, click/drag navigation and scroll endpoints.
 `node tests/layout-fixture.mjs` writes `/tmp/minimap-layout.html`, a browser fixture for resize, tab and wrapping checks. It uses representative editor markup, not Obsidian itself.
 
-This release has **not been visually verified inside Obsidian**. Source mode still uses a separate text renderer, with Markdown/Prism highlighting; it is not a pixel-for-pixel clone of CodeMirror. Custom themes, hanging list indentation, inline fold replacements and third-party editor decorations may differ. Live Preview and Reading mode retain the upstream renderer. Very large notes still create one DOM row per source line.
+This release has **not been visually verified inside Obsidian**. Editing modes use a separate line renderer with Markdown/Prism highlighting, not a pixel-for-pixel clone of CodeMirror. Live Preview supports common inline formatting; rich embeds, tables, math, callouts, code fences and frontmatter remain source-like in the minimap. Nested inline formatting, theme-specific hanging list indentation and third-party decorations may differ. Reading mode retains the upstream renderer. Very large notes still create one DOM row per source line.
 
 Before relying on it, check a long note in Source mode: scroll through new sections and pause; click text in the middle/bottom of the minimap; drag its marker; fold/unfold headings and lists; resize the pane; switch modes; and toggle the plugin off/on to verify the editor layout stays unchanged.
 

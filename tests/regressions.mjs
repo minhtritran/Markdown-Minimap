@@ -7,16 +7,41 @@ export { requiredEditorPadding } from './src/document-metrics';
 export { SourceMap } from './src/source-map';
 export { computeScrollMetrics } from './src/scroll-model';
 export { MinimapPointer } from './src/pointer';
-export { applySourceFolds } from './src/source-view';
+export { applySourceFolds, buildSourceLineDom } from './src/source-view';
 export { EditorState } from '@codemirror/state';
 export { foldEffect, codeFolding } from '@codemirror/language';
 `,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',plugins:[{
 name:'obsidian-test-stub',setup(b){b.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class Component {}; export const MarkdownRenderer = {};'}));}
 }]});
-const {requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const {requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const near=(a,b)=>assert.ok(Math.abs(a-b)<0.001,`${a} != ${b}`);
 let passed=0;
 function test(name,fn){fn();passed++;console.log('PASS',name);}
+// Minimal DOM verifies generated text and row boundaries, not browser layout.
+class TextElement {
+ children=[]; className=''; value='';
+ classList={add:(...names)=>{this.className+=' '+names.join(' ');}};
+ appendChild(child){this.children.push(child);return child;}
+ set textContent(value){this.value=value;this.children=[];}
+ get textContent(){return this.value+this.children.map(c=>c.textContent).join('');}
+}
+globalThis.activeWindow={};globalThis.window={};
+globalThis.activeDocument={createElement:()=>new TextElement(),createDocumentFragment:()=>new TextElement(),createTextNode:text=>({textContent:text})};
+const texts=dom=>dom.elements.map(e=>e.textContent);
+test('Live Preview keeps literal tabs, blank rows and nested list depth',()=>{
+ const input='\tparent\n\t\tchild\n\n\t1. first\n\t\t2. second\n\t- [x] done';
+ assert.deepEqual(texts(buildSourceLineDom(input,true)),['\tparent','\t\tchild','\u200b','\t1. first','\t\t2. second','\t• ☑ done']);
+ assert.deepEqual(texts(buildSourceLineDom(input)),input.split('\n').map(t=>t||'\u200b'));
+});
+test('Live Preview formats inline text but preserves active-line source syntax',()=>{
+ const input='# Heading\n\t**bold** *italic* ==mark== ~~strike~~ `code` [[Note|Alias]] [label](url)';
+ assert.deepEqual(texts(buildSourceLineDom(input,true)),['Heading','\tbold italic mark strike code Alias label']);
+ assert.deepEqual(texts(buildSourceLineDom(input,true,new Set([1,2]))),input.split('\n'));
+});
+test('Live Preview keeps code and frontmatter literal and never injects HTML',()=>{
+ const input='---\nname: **raw**\n---\n```\n\t**code**\n```\n<script>alert(1)</script>';
+ assert.deepEqual(texts(buildSourceLineDom(input,true)),input.split('\n'));
+});
 function editor(heights){
  const blocks=heights.map((height,i)=>({from:i*10,top:heights.slice(0,i).reduce((a,b)=>a+b,0),height}));
  blocks.forEach(b=>b.bottom=b.top+b.height);

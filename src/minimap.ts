@@ -229,7 +229,7 @@ export class Minimap implements PointerHost {
         // anything the Markdown renderer produced, so re-pin rather than
         // re-render the whole note. Checked before the signature, since the
         // widget can also be resized by editing a property.
-        if (this.isRawSourceMode()) {
+        if (!this.isReadModeActive()) {
             const signature = sourceFoldSignature(this.getEditorView());
             if (signature === this.foldSignature) return false;
             this.foldSignature = signature;
@@ -249,7 +249,7 @@ export class Minimap implements PointerHost {
      * Source mode applies actual CodeMirror fold ranges separately.
      */
     private applyFolds(foldHeads: number[]) {
-        if (this.isRawSourceMode()) {
+        if (!this.isReadModeActive()) {
             this.hiddenHeadings = new Set();
             return;
         }
@@ -458,7 +458,7 @@ export class Minimap implements PointerHost {
             container: this.container,
             content: this.content,
             readMode: this.isReadModeActive(),
-            rawSourceMode: this.isRawSourceMode(),
+            rawSourceMode: !this.isReadModeActive(),
             hitbox: this.hitbox,
         });
         this.syncCodeBlockMetrics();
@@ -547,7 +547,17 @@ export class Minimap implements PointerHost {
         const file = this.view.file;
         if (!file || !this.content) return;
 
-        const dom = buildSourceLineDom(this.getEditorView()?.state.doc.toString() ?? this.view.getViewData());
+        const editor = this.getEditorView();
+        const activeLines = new Set<number>();
+        if (!this.isRawSourceMode() && editor?.hasFocus) {
+            for (const range of editor.state.selection.ranges) {
+                const start = editor.state.doc.lineAt(range.from).number;
+                const end = editor.state.doc.lineAt(range.to).number;
+                for (let line = start; line <= end; line++) activeLines.add(line);
+            }
+        }
+        const dom = buildSourceLineDom(editor?.state.doc.toString() ?? this.view.getViewData(),
+            !this.isRawSourceMode(), activeLines);
         this.renderComponent?.unload();
         this.renderComponent = null;
 
@@ -571,7 +581,7 @@ export class Minimap implements PointerHost {
         if (dom.prismPending) {
             void warmPrism(this.plugin.app).then(() => {
                 if (!this.content || !isPrismReady()) return;
-                if (!this.isRawSourceMode()) return;
+                if (this.isReadModeActive()) return;
                 this.renderSourceText();
             });
         }
@@ -586,7 +596,7 @@ export class Minimap implements PointerHost {
         if (this.sourceRenderFrame || !this.content) return;
         this.sourceRenderFrame = this.element.ownerDocument.defaultView!.requestAnimationFrame(() => {
             this.sourceRenderFrame = 0;
-            if (this.content && this.isRawSourceMode()) this.renderSourceText();
+            if (this.content && !this.isReadModeActive()) this.renderSourceText();
         });
     }
 
@@ -598,7 +608,7 @@ export class Minimap implements PointerHost {
         const file = this.view.file;
         if (!file || !this.content) return;
 
-        if (this.isRawSourceMode()) {
+        if (!this.isReadModeActive()) {
             this.renderSourceText();
             return;
         }
@@ -711,9 +721,9 @@ export class Minimap implements PointerHost {
         // collapsed sections have to be folded back out of it before anything
         // measures the result.
         const foldHeads = readFoldHeads(this.view);
-        this.foldSignature = this.isRawSourceMode()
+        this.foldSignature = !this.isReadModeActive()
             ? sourceFoldSignature(this.getEditorView()) : foldHeads.join(",");
-        if (this.isRawSourceMode()) this.refreshSourceLayout();
+        if (!this.isReadModeActive()) this.refreshSourceLayout();
         this.applyFolds(foldHeads);
         this.anchors.capture(
             this.content,
@@ -755,7 +765,7 @@ export class Minimap implements PointerHost {
     private remeasure = () => {
         if (!this.content) return;
         this.syncDocumentMetrics();
-        if (this.isRawSourceMode()) this.refreshSourceLayout();
+        if (!this.isReadModeActive()) this.refreshSourceLayout();
         // Fold the panel before it is measured, not after. Direct rather than
         // via checkFolds, which would call back into here.
         this.syncFoldState();
@@ -793,7 +803,7 @@ export class Minimap implements PointerHost {
         this.anchors.revalidate(heights.contentHeight);
         // Reading view virtualizes its sections, so anchors never apply there.
         const usable =
-            !this.isReadModeActive() && !this.isRawSourceMode() &&
+            !this.isReadModeActive() && this.sourceLineElements.length === 0 &&
             this.anchors.prepare(
                 this.getEditorView(),
                 this.getEditorContentOffset(),
@@ -805,7 +815,7 @@ export class Minimap implements PointerHost {
         // documentTop excludes CM's top padding, unlike contentDOM's rect.
         const sourceOffset = editor && scroller
             ? editor.documentTop - scroller.getBoundingClientRect().top + scroller.scrollTop : 0;
-        this.sourceMapInUse = this.isRawSourceMode() && this.sourceMap.prepare(
+        this.sourceMapInUse = !this.isReadModeActive() && this.sourceMap.prepare(
             editor, sourceOffset, heights.effectiveScrollHeight, heights.contentHeight
         );
 

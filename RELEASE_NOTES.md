@@ -1,10 +1,11 @@
-Source Minimap 2.6.3 — automatic right padding without pane resizing
+Source Minimap 2.7.0 — Live Preview indentation
 
-- Remove Make room for the minimap and the source-view width, margin-shifting and clipping rules that affected the left gutter.
-- Use the working .cm-scroller padding-right and box-sizing: border-box approach instead.
-- Calculate the required padding from the minimap's rendered left edge with a 12px gap, preserving larger theme padding. Recalculate when the pane or minimap scale changes.
-- No new setting is needed. Ignore the old reserveSpace value and clean up obsolete layout markers.
+- Preserve tabs, nested numbered/bulleted lists and blank rows in Live Preview.
+- Use the editor's font, tab width, wrapping and letter spacing in both editing modes.
+- Render common inline formatting without its delimiters; keep source syntax on active editor lines.
+- Use source-line navigation and actual CodeMirror fold ranges in Live Preview too.
+- Preserve the working automatic right padding and independent source-minimap plugin ID.
 
-Eight regression tests and the production build pass. In-app visual confirmation in the user's Obsidian theme remains necessary.
+Eleven regression tests and the production build pass. Not visually verified inside Obsidian; please check your indented note after updating through BRAT.
 
-Update Source Minimap through BRAT and reload the plugin. Its separate plugin ID remains source-minimap.
+This is a line-based Live Preview approximation, not a complete editor clone. Rich embeds, tables, math, callouts, fences and properties remain source-like in the minimap. Reading view is unchanged.

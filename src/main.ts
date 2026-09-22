@@ -28,9 +28,10 @@ export default class NoteMinimap extends Plugin {
 
     async onload() {
         this.registerEditorExtension(EditorView.updateListener.of((update) => {
-            if (!update.docChanged) return;
+            if (!update.docChanged && !update.selectionSet && !update.focusChanged) return;
             for (const note of this.minimapInstances.values()) {
-                if (note.isRawSourceMode() && note.sourceView.contains(update.view.dom)) {
+                if (!note.isReadModeActive() && note.sourceView.contains(update.view.dom) &&
+                    (update.docChanged || !note.isRawSourceMode())) {
                     note.scheduleSourceRender();
                 }
             }
