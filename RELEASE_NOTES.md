@@ -1,12 +1,5 @@
-Source Minimap 2.7.4 — suspend hidden panes and improve cleanup
+Source Minimap 2.7.5 — stable width while typing
 
-- Defer rendering, measurement and fold/scroll work for hidden or detached panes; refresh stale content when shown.
-- Release closed editor roots from the shared mode observer and clear retained minimap row arrays on destruction.
-- Prevent delayed view updates from recreating minimaps after closing panes or unloading/disabling the plugin.
-- Update the profiler to include newly opened panes without retaining closed pane instances.
+Fix incremental edits remeasuring the minimap wrapping width from a rendered editor line. Preserve the established width during typing; resize, theme, settings and mode changes still remeasure. Missing widths initialize normally, and hidden zero-width measurements retain the last valid width.
 
-Hidden panes retain their existing minimap DOM; this change targets background CPU work and closed-pane cleanup. No measured memory or timing improvement is claimed yet.
-
-Nineteen regression tests and the production build pass, including hidden-pane deferral and refresh-on-reveal. Update through BRAT, reload the plugin, and paste the updated profiler script before testing tab switching and closing panes.
-
-This is a line-based Live Preview approximation, not a complete editor clone. Rich embeds, tables, math, callouts, fences and properties remain source-like in the minimap. Reading view is unchanged.
+Twenty regression tests and the production build pass. The new test checks stable width across varying edit-time measurements, resize updates and hidden-pane preservation. In-app confirmation of the reported width-shifting regression is still needed.

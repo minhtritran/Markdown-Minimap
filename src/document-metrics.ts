@@ -72,6 +72,16 @@ export function requiredEditorPadding(innerRight: number, stripLeft: number, the
     return Math.ceil(Math.max(themePadding, innerRight - stripLeft + 12));
 }
 
+/** Keep the established wrapping width during edits; only layout changes remeasure it. */
+export function syncTextWidth(container: HTMLElement, measure: () => number, refresh: boolean): void {
+    const current = pixels(container.style.getPropertyValue("--source-minimap-doc-width"));
+    if (!refresh && current > 0) return;
+    const width = measure();
+    if (width > 0 && width !== current) {
+        container.style.setProperty("--source-minimap-doc-width", `${width}px`);
+    }
+}
+
 /** Width inside an element's own padding, which is where its text wraps. */
 function innerWidth(this: void, element: HTMLElement | null): number {
     if (!element) return 0;
@@ -205,11 +215,7 @@ export function mirrorDocumentMetrics(
         element.style.setProperty("--source-minimap-editor-right-padding", `${padding}px`);
     }
 
-    const textWidth = measureTextWidth(element, readMode, sizer);
-    // A hidden pane measures 0; keep the last good width.
-    if (textWidth > 0) {
-        container.style.setProperty("--source-minimap-doc-width", `${textWidth}px`);
-    }
+    syncTextWidth(container, () => measureTextWidth(element, readMode, sizer), refreshPadding);
 
     // Bind the track to the editor's visible height. Left to `height: 100%` it
     // resolves against a taller ancestor, putting the end of the track below

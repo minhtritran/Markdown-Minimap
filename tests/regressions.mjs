@@ -3,7 +3,7 @@ import { build } from 'esbuild';
 
 // Bundle the shipped modules, not a second implementation of the math.
 const bundle = await build({stdin:{contents:`
-export { requiredEditorPadding } from './src/document-metrics';
+export { requiredEditorPadding, syncTextWidth } from './src/document-metrics';
 export { Minimap } from './src/minimap';
 export { SourceMap } from './src/source-map';
 export { computeScrollMetrics } from './src/scroll-model';
@@ -14,10 +14,20 @@ export { foldEffect, codeFolding } from '@codemirror/language';
 `,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',plugins:[{
 name:'obsidian-test-stub',setup(b){b.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class Component {}; export const MarkdownRenderer = {};'}));}
 }]});
-const {Minimap,requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,updatePreviewSelection,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const {syncTextWidth,Minimap,requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,updatePreviewSelection,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const near=(a,b)=>assert.ok(Math.abs(a-b)<0.001,`${a} != ${b}`);
 let passed=0;
 function test(name,fn){fn();passed++;console.log('PASS',name);}
+test('typing cannot change wrapping width; resize can, and hidden measurements retain it',()=>{
+ let value='',reads=0;
+ const container={style:{getPropertyValue:()=>value,setProperty:(_,v)=>{value=v;}}};
+ const measure=width=>()=>{reads++;return width;};
+ syncTextWidth(container,measure(800),false);assert.equal(value,'800px');
+ for(const width of [790,810,795])syncTextWidth(container,measure(width),false);
+ assert.equal(value,'800px');assert.equal(reads,1);
+ syncTextWidth(container,measure(600),true);assert.equal(value,'600px');
+ syncTextWidth(container,measure(0),true);assert.equal(value,'600px');
+});
 test('hidden and detached panes defer edits and full renders without reading the document',()=>{
  const note=Object.create(Minimap.prototype);
  note.content={};note.element={isConnected:true,getClientRects:()=>[]};
