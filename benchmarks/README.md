@@ -43,7 +43,14 @@ the same note, theme, pane width and plugin set before/after updating:
 6. Use the DevTools Performance recording for frame/layout/paint timing and GC.
 
 Profiler method timings overlap and must not be summed. Long tasks cover the
-whole app, not just this plugin. Restart the profiler after opening new panes.
+whole app, not just this plugin. Prototype hooks now include newly opened panes
+and do not retain closed pane instances. Restart the profiler after reloading
+the plugin itself.
+
+For the hidden-pane change, open a second tab, edit and switch back, then close
+one tab. Verify the minimap catches up when shown and the reported pane count
+drops after closing. Hidden panes retain their DOM but defer render/measurement
+work; app-wide heap fluctuations still cannot establish plugin memory savings.
 In-app measurements have not been run here.
 
 ## Guardrails and remaining costs

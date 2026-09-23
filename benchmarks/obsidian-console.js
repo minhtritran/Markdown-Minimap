@@ -9,9 +9,13 @@
     let dropped = 0;
     const restores = [];
     const longTasks = [];
-    for (const note of plugin.minimapInstances.values()) {
+    // Prototype hooks include panes created after profiling starts, without
+    // keeping closed pane instances alive through restore closures.
+    const prototypes = new Set([...plugin.minimapInstances.values()].map(note => Object.getPrototypeOf(note)));
+    if (!prototypes.size) throw new Error('Open a note with a minimap before starting the profiler');
+    for (const prototype of prototypes) {
         for (const method of ['renderSourceText', 'getScrollMetrics', 'syncDocumentMetrics']) {
-            const original = note[method];
+            const original = prototype[method];
             const wrapped = function (...args) {
                 const start = performance.now();
                 try { return original.apply(this, args); }
@@ -20,8 +24,8 @@
                     else dropped++;
                 }
             };
-            note[method] = wrapped;
-            restores.push(() => { if (note[method] === wrapped) note[method] = original; });
+            prototype[method] = wrapped;
+            restores.push(() => { if (prototype[method] === wrapped) prototype[method] = original; });
         }
     }
     const observer = new PerformanceObserver(list => {
@@ -56,5 +60,5 @@
         reset() { records.length = 0; longTasks.length = 0; dropped = 0; initial = snapshot(); },
         stop() { restores.forEach(restore => restore()); restores.length = 0; observer.disconnect(); return report(); }
     };
-    console.log('Profiling current panes. Run sourceMinimapPerf.stop() when finished. Timings overlap; do not sum them.');
+    console.log('Profiling current and newly opened panes. Run sourceMinimapPerf.stop() when finished. Timings overlap; do not sum them.');
 })();

@@ -1,12 +1,12 @@
-Source Minimap 2.7.3 — avoid editor reflow during typing
+Source Minimap 2.7.4 — suspend hidden panes and improve cleanup
 
-- Preserve the current right-padding reservation during incremental edits instead of removing and recalculating it through repeated layout passes.
-- Stop scheduling two additional full resize passes after each incremental edit.
-- Still refresh typography, document geometry, folds and navigation during edits.
-- Keep full padding recalculation for initial rendering, resizing, theme/settings changes and mode changes; recover if the padding class is missing.
+- Defer rendering, measurement and fold/scroll work for hidden or detached panes; refresh stale content when shown.
+- Release closed editor roots from the shared mode observer and clear retained minimap row arrays on destruction.
+- Prevent delayed view updates from recreating minimaps after closing panes or unloading/disabling the plugin.
+- Update the profiler to include newly opened panes without retaining closed pane instances.
 
-Targets expensive document-metric synchronization identified through in-app profiling. The JavaScript rendering microbenchmark does not measure this browser layout work, so no new timing improvement is claimed until another in-app profile is collected.
+Hidden panes retain their existing minimap DOM; this change targets background CPU work and closed-pane cleanup. No measured memory or timing improvement is claimed yet.
 
-Seventeen regression tests and the production build pass. Includes a render-lifecycle regression verifying that edits update navigation without triggering resize timers, while full renders retain the settling path. Update through BRAT, reload the plugin, and repeat the same profiler session.
+Nineteen regression tests and the production build pass, including hidden-pane deferral and refresh-on-reveal. Update through BRAT, reload the plugin, and paste the updated profiler script before testing tab switching and closing panes.
 
 This is a line-based Live Preview approximation, not a complete editor clone. Rich embeds, tables, math, callouts, fences and properties remain source-like in the minimap. Reading view is unchanged.

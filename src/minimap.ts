@@ -69,6 +69,14 @@ export class Minimap implements PointerHost {
     private resizeSettleTimer = 0;
     private resizeTimer = 0;
     private sourceRenderFrame = 0;
+    private hiddenDirty = false;
+
+    private deferWhileHidden(): boolean {
+        if (!this.content) return true;
+        if (this.element.isConnected && this.element.getClientRects().length > 0) return false;
+        this.hiddenDirty = true;
+        return true;
+    }
     private sourceDocumentDirty = false;
     private renderedSource: SourceLineDom | null = null;
 
@@ -208,11 +216,13 @@ export class Minimap implements PointerHost {
     }
 
     private onPossibleFoldChange = () => {
+        if (this.deferWhileHidden()) return;
         window.clearTimeout(this.foldCheckTimer);
         this.foldCheckTimer = window.setTimeout(this.checkFolds, 200);
     };
 
     private checkFolds = () => {
+        if (this.deferWhileHidden()) return;
         if (this.syncFoldState()) void this.onResize();
     };
 
@@ -323,6 +333,9 @@ export class Minimap implements PointerHost {
         this.viewport = null;
         this.content = null;
         this.renderedSource = null;
+        this.sourceLineElements = [];
+        this.headingLines = [];
+        this.headingLevels = [];
         this.slider = null;
         this.hitbox = null;
         this.scroller = null;
@@ -457,6 +470,7 @@ export class Minimap implements PointerHost {
     // --- measurement ------------------------------------------------------
 
     syncDocumentMetrics(refreshPadding = true) {
+        if (this.deferWhileHidden()) return;
         if (!this.container || !this.content) return;
         mirrorDocumentMetrics({
             element: this.element,
@@ -550,6 +564,12 @@ export class Minimap implements PointerHost {
      * show, and blank lines and frontmatter need no special handling.
      */
     renderSourceText(selectionOnly = false) {
+        if (this.deferWhileHidden()) return;
+        if (this.hiddenDirty) {
+            this.hiddenDirty = false;
+            this.renderedSource = null;
+            selectionOnly = false;
+        }
         const file = this.view.file;
         if (!file || !this.content) return;
 
@@ -618,6 +638,7 @@ export class Minimap implements PointerHost {
     }
 
     scheduleSourceRender(documentChanged = true) {
+        if (this.deferWhileHidden()) return;
         this.sourceDocumentDirty ||= documentChanged;
         if (this.sourceRenderFrame || !this.content) return;
         this.sourceRenderFrame = this.element.ownerDocument.defaultView!.requestAnimationFrame(() => {
@@ -632,6 +653,8 @@ export class Minimap implements PointerHost {
     // Blank-line markers retain the source's vertical spacing without
     // replacing Obsidian's rendered Markdown output.
     async render() {
+        if (this.deferWhileHidden()) return;
+        this.hiddenDirty = false;
         const renderVersion = ++this.renderVersion;
         const file = this.view.file;
         if (!file || !this.content) return;
@@ -668,7 +691,7 @@ export class Minimap implements PointerHost {
         }
 
         // A newer render started (or we were destroyed) while awaiting
-        if (renderVersion !== this.renderVersion || !this.content) {
+        if (renderVersion !== this.renderVersion || !this.content || this.deferWhileHidden()) {
             component.unload();
             return;
         }
@@ -775,6 +798,7 @@ export class Minimap implements PointerHost {
     // CodeMirror's scrollHeight is an estimate that settles shortly after a
     // jump, so re-sync once more after scrolling stops.
     onScroll = () => {
+        if (this.deferWhileHidden()) return;
         this.updateSliderScroll();
         window.clearTimeout(this.trailingSyncTimer);
         this.trailingSyncTimer = window.setTimeout(this.settleAfterScroll, 350);
@@ -783,11 +807,17 @@ export class Minimap implements PointerHost {
     // Source layout stays fixed during scrolling. Only navigation consults
     // CodeMirror's changing height estimates; they never resize panel rows.
     settleAfterScroll = () => {
+        if (this.deferWhileHidden()) return;
         this.checkFolds();
         this.updateSliderScroll();
     };
 
     async onResize() {
+        if (this.deferWhileHidden()) return;
+        if (this.hiddenDirty) {
+            void this.render();
+            return;
+        }
         window.clearTimeout(this.resizeTimer);
         this.resizeTimer = window.setTimeout(() => {
             this.remeasure();
@@ -798,6 +828,7 @@ export class Minimap implements PointerHost {
 
     /** One full measuring pass over the note's layout. */
     private remeasure = () => {
+        if (this.deferWhileHidden()) return;
         if (!this.content) return;
         this.syncDocumentMetrics();
         if (!this.isReadModeActive()) this.refreshSourceLayout();

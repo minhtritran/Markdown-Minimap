@@ -18,6 +18,27 @@ const {Minimap,requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPoint
 const near=(a,b)=>assert.ok(Math.abs(a-b)<0.001,`${a} != ${b}`);
 let passed=0;
 function test(name,fn){fn();passed++;console.log('PASS',name);}
+test('hidden and detached panes defer edits and full renders without reading the document',()=>{
+ const note=Object.create(Minimap.prototype);
+ note.content={};note.element={isConnected:true,getClientRects:()=>[]};
+ Object.defineProperty(note,'view',{get(){throw new Error('Hidden pane read document');}});
+ note.scheduleSourceRender(true);note.render();note.renderSourceText();note.syncDocumentMetrics();
+ assert.equal(note.hiddenDirty,true);
+ assert.equal(note.sourceRenderFrame,undefined);
+ note.hiddenDirty=false;note.element.isConnected=false;
+ note.element.getClientRects=()=>[{}];note.scheduleSourceRender(true);
+ assert.equal(note.hiddenDirty,true);
+ note.content=null;note.hiddenDirty=false;note.render();
+ assert.equal(note.hiddenDirty,false);
+});
+test('revealing a dirty pane requests a fresh render before layout measurement',()=>{
+ const note=Object.create(Minimap.prototype);
+ note.content={};note.element={isConnected:true,getClientRects:()=>[{}]};
+ note.hiddenDirty=true;let renders=0;
+ note.render=()=>{renders++;note.hiddenDirty=false;};
+ note.onResize();
+ assert.equal(renders,1);assert.equal(note.hiddenDirty,false);
+});
 test('incremental render preserves padding and avoids resize timers while refreshing navigation',()=>{
  const calls=[];
  const host={view:{},syncDocumentMetrics:full=>calls.push(['metrics',full]),isReadModeActive:()=>false,

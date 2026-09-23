@@ -25,8 +25,10 @@ export default class NoteMinimap extends Plugin {
     settings!: MarkdownMinimapSettings;
     /** Off on this device only; see DEVICE_DISABLED_KEY. */
     deviceDisabled = false;
+    private stopped = false;
 
     async onload() {
+        this.stopped = false;
         this.registerEditorExtension(EditorView.updateListener.of((update) => {
             if (!update.docChanged && !update.selectionSet && !update.focusChanged) return;
             for (const note of this.minimapInstances.values()) {
@@ -187,6 +189,7 @@ export default class NoteMinimap extends Plugin {
         });
 
         this.app.workspace.onLayoutReady(() => {
+            if (this.stopped) return;
             this.activeNoteView =
                 this.app.workspace.getActiveViewOfType(MarkdownView);
             this.injectMinimapIntoAllNotes();
@@ -194,6 +197,7 @@ export default class NoteMinimap extends Plugin {
     }
 
     onunload() {
+        this.stopped = true;
         // IMPORTANT: Obsidian automatically unregisters hooks made only by using this.registerEvent or this.registerDomEvent.
 
         // Free timeout
@@ -283,8 +287,10 @@ export default class NoteMinimap extends Plugin {
         // Wait for Obsidian to finish applying leaf/view changes before
         // reading editor DOM state. No equivalent settled event exists.
         await sleep(100);
+        if (this.stopped || this.deviceDisabled) return;
         const element = view.contentEl;
         if (!element.isConnected) return;
+        if (!this.app.workspace.getLeavesOfType("markdown").some(leaf => leaf.view === view)) return;
 
         // Assert it's a markdown note by checking for the two needed children.
         // The reading-view scope avoids matching the minimap's own content div.
@@ -321,7 +327,11 @@ export default class NoteMinimap extends Plugin {
         existing.destroy();
         this.minimapInstances.delete(element);
         this.resizeObserver.unobserve(element);
-        // MutationObserver.unobserve() does not exist...
+        // Release the observer's reference to the closed editor root.
+        this.modeObserver.disconnect();
+        for (const note of this.minimapInstances.values()) {
+            this.modeObserver.observe(note.sourceView, { attributes: true });
+        }
     }
 
     addActionButtonsToView(view: MarkdownView) {
