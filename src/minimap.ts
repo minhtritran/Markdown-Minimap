@@ -37,7 +37,7 @@ import {
 import type { ScrollMetrics } from "./scroll-model";
 import type { MarkdownMinimapSettings } from "./settings";
 import type NoteMinimap from "./main";
-import { clamp, computedStyle, pixels, toRGBAAlpha } from "./utils";
+import { clamp, computedStyle, pixels } from "./utils";
 
 export class Minimap implements PointerHost {
     plugin: NoteMinimap;
@@ -62,7 +62,6 @@ export class Minimap implements PointerHost {
     scrollbarGutter = 14;
     minViewportHeight = 24;
     centerOnClick = true;
-    backgroundColor = "";
     renderVersion = 0;
     trailingSyncTimer = 0;
     /** Pending second measuring pass after a pane resize. */
@@ -363,12 +362,6 @@ export class Minimap implements PointerHost {
         this.minViewportHeight = settings.minViewportHeight;
         this.centerOnClick = settings.centerOnClick;
 
-        this.backgroundColor = toRGBAAlpha(
-            this.element.getCssPropertyValue("--background-primary").trim() ||
-                this.element.getCssPropertyValue("background-color"),
-            this.minimapOpacity
-        );
-
         this.updateSettingsInCSS();
         void this.onResize();
     }
@@ -377,6 +370,7 @@ export class Minimap implements PointerHost {
         if (this.container) {
             this.container.style.setProperty("--source-minimap-scale", String(this.scale));
             this.container.style.setProperty("--source-minimap-text-opacity", String(this.textOpacity));
+            this.container.style.setProperty("--source-minimap-background-opacity", String(this.minimapOpacity));
             this.container.style.setProperty(
                 "--source-minimap-top-offset",
                 `${this.topOffset || 0}px`
@@ -402,7 +396,7 @@ export class Minimap implements PointerHost {
             );
         }
         if (this.content)
-            this.content.style.backgroundColor = this.backgroundColor;
+            this.content.style.removeProperty("background-color");
         this.syncDocumentMetrics();
     }
 

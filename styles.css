@@ -43,6 +43,8 @@
    The extra specificity intentionally overrides .markdown-preview-view's
    height/overflow so the content keeps its natural rendered height. */
 .source-minimap-container .source-minimap-viewport > .source-minimap-content {
+    background-color: transparent;
+    isolation: isolate;
     position: relative;
     inset: auto;
     margin: 0;
@@ -52,6 +54,19 @@
     overflow: visible;
     padding: var(--source-minimap-doc-padding-top, 0px) 0
         var(--source-minimap-doc-trailing, 0px) 0;
+}
+
+/* Resolve the theme color live in CSS. A JS-cached inline color can outlive a
+   theme change. A separate layer preserves background opacity without dimming
+   the text, and works for any valid theme color syntax. */
+.source-minimap-container .source-minimap-viewport > .source-minimap-content::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--background-primary);
+    opacity: var(--source-minimap-background-opacity, 0.3);
 }
 
 /* Sized to the height the properties occupy in the note itself, whether they

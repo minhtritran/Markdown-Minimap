@@ -1,7 +1,5 @@
-Source Minimap 2.7.7 — light-theme contrast
+Source Minimap 2.7.8 — live theme background
 
-Use the theme's primary note background for the minimap instead of a potentially transparent container color. Preserve fully transparent fallback colors rather than turning transparent black into a grey overlay.
+Remove the JavaScript-cached inline background color. Draw the minimap background in an isolated CSS layer using the current --background-primary value, so theme changes cannot leave an old dark tint behind. Clear any previous inline background and preserve independent background, text and marker opacity settings.
 
-In light themes, tint the viewport marker with the theme accent and add an inset outline. Existing background, text and marker opacity settings continue to apply. Dark-theme marker styling is unchanged.
-
-Twenty-three regression tests and the production build pass. Visual confirmation in the user's Obsidian theme remains outstanding.
+Twenty-three existing regression tests and the production build pass. The light-theme visual fix still needs confirmation in Obsidian after updating and reloading the plugin.
