@@ -592,7 +592,6 @@ export class Minimap implements PointerHost {
         }
 
         this.sourceLineElements = dom.elements;
-        this.refreshSourceLayout();
 
         this.headingLines = dom.headingLines;
         this.headingLevels = dom.headingLevels;

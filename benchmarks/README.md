@@ -26,6 +26,11 @@ thresholds on shared machines.
 
 ## Actual Obsidian measurements
 
+The profiler now reports approximate app-wide JavaScript heap usage and minimap
+element counts before/after the session. Neither is retained plugin memory:
+use DevTools heap snapshots and retaining paths for that. Samples are capped at
+10,000 so leaving the profiler running does not grow its arrays without bound.
+
 Paste `obsidian-console.js` into the desktop developer console. It instruments
 current minimap instances temporarily; no note content is collected. Repeat on
 the same note, theme, pane width and plugin set before/after updating:
@@ -52,3 +57,28 @@ changing a fence cannot leave stale formatting below it. Code/frontmatter rows
 are rebuilt to preserve Prism readiness and language changes. Insert/delete and
 explicit file/mode renders conservatively rebuild rows. Cross-line selection
 changes still measure the source map, and typing still performs layout work.
+
+## 2.7.2 follow-up
+
+`optimized-2.7.2.json` records a follow-up run of the same benchmark:
+
+| Lines | 2.7.1 typing median | 2.7.2 typing median |
+| --- | ---: | ---: |
+| 1,000 | 0.318 ms | 0.369 ms |
+| 6,000 | 2.011 ms | 0.717 ms |
+| 20,000 | 6.830 ms | 4.856 ms |
+
+Small notes showed no benefit in this run. These are single-process benchmark
+samples, not a controlled Obsidian comparison. Initial opening remains costly.
+
+Same-line-count edits within letter-led prose now reuse classification when
+indentation remains unchanged. Other edits still use the full parser. Reused
+classification also permits reuse of highlighting and unchanged code rows;
+Prism readiness changes invalidate that reuse. Cached token data belongs only
+to the current rendered document, not a history of edits. This trades some
+retained token memory for less repeated CPU work; no net memory saving is claimed.
+
+Geometry capture now reads offsetHeight once and offsetTop once per visible row,
+reuses its row records and drops obsolete entries. The immediate duplicate fold
+and geometry pass before afterRender was removed. Regression tests assert read
+counts and mapping behavior; actual browser layout timing is still unmeasured.

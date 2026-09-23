@@ -1,0 +1,90 @@
+{
+  "runtime": "v24.19.0",
+  "scope": "JS rendering with a minimal DOM; excludes browser layout, paint, Obsidian and Prism",
+  "results": [
+    {
+      "lines": 1000,
+      "scenario": "open",
+      "medianMs": 1.524,
+      "p95Ms": 3.982,
+      "nodesPerOperation": 6066
+    },
+    {
+      "lines": 1000,
+      "scenario": "cursor-line",
+      "medianMs": 0.005,
+      "p95Ms": 0.008,
+      "nodesPerOperation": 10
+    },
+    {
+      "lines": 1000,
+      "scenario": "cursor-same-line",
+      "medianMs": 0.001,
+      "p95Ms": 0.001,
+      "nodesPerOperation": 0
+    },
+    {
+      "lines": 1000,
+      "scenario": "type",
+      "medianMs": 0.369,
+      "p95Ms": 0.596,
+      "nodesPerOperation": 21
+    },
+    {
+      "lines": 6000,
+      "scenario": "open",
+      "medianMs": 9.457,
+      "p95Ms": 14.777,
+      "nodesPerOperation": 36408
+    },
+    {
+      "lines": 6000,
+      "scenario": "cursor-line",
+      "medianMs": 0.004,
+      "p95Ms": 0.005,
+      "nodesPerOperation": 10
+    },
+    {
+      "lines": 6000,
+      "scenario": "cursor-same-line",
+      "medianMs": 0,
+      "p95Ms": 0.001,
+      "nodesPerOperation": 0
+    },
+    {
+      "lines": 6000,
+      "scenario": "type",
+      "medianMs": 0.717,
+      "p95Ms": 1.051,
+      "nodesPerOperation": 19
+    },
+    {
+      "lines": 20000,
+      "scenario": "open",
+      "medianMs": 43.134,
+      "p95Ms": 89.415,
+      "nodesPerOperation": 121348
+    },
+    {
+      "lines": 20000,
+      "scenario": "cursor-line",
+      "medianMs": 0.003,
+      "p95Ms": 0.004,
+      "nodesPerOperation": 10
+    },
+    {
+      "lines": 20000,
+      "scenario": "cursor-same-line",
+      "medianMs": 0,
+      "p95Ms": 0,
+      "nodesPerOperation": 0
+    },
+    {
+      "lines": 20000,
+      "scenario": "type",
+      "medianMs": 4.856,
+      "p95Ms": 8.048,
+      "nodesPerOperation": 19
+    }
+  ]
+}

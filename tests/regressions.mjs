@@ -29,6 +29,37 @@ globalThis.activeWindow={};globalThis.window={};
 globalThis.activeDocument={createElement:()=>new TextElement(),createDocumentFragment:()=>new TextElement(),createTextNode:text=>({textContent:text})};
 const texts=dom=>dom.elements.map(e=>e.textContent);
 const snapshot=dom=>({text:texts(dom),classes:dom.elements.map(e=>e.className),headings:dom.headingLines,levels:dom.headingLevels});
+test('plain-edit shortcut matches full parsing at every position around Markdown boundaries',()=>{
+ const fixtures=['intro\nparagraph\n---\ntail','---\nkey: value\n---\ntext','```js\ncode\n```\ntext','first\nsecond\n===\nlast','> ```\ncode\n> ```\ntext','heading\n\ntext\nlast'];
+ const replacements=['ordinary text','中文正文','\tindented','    indented','', '# heading', '---', '...', '```', '~~~', '> quote', '- list', '1. list', '==='];
+ for(const input of fixtures) for(let i=0;i<input.split('\n').length;i++) for(const text of replacements){
+  const before=buildSourceLineDom(input,true);
+  const lines=input.split('\n');lines[i]=text;
+  const next=lines.join('\n');
+  assert.deepEqual(snapshot(buildSourceLineDom(next,true,new Set(),before)),snapshot(buildSourceLineDom(next,true)),`${input} -> ${next}`);
+ }
+});
+test('prose edits reuse highlighting; code edits and Prism readiness invalidate it',()=>{
+ const before=buildSourceLineDom('intro\n```js\ncode\n```',true);
+ const edited=buildSourceLineDom('intro changed\n```js\ncode\n```',true,new Set(),before);
+ assert.equal(edited.highlights,before.highlights);
+ assert.equal(edited.elements[2],before.elements[2]);
+ const codeEdit=buildSourceLineDom('intro changed\n```js\nnewCode\n```',true,new Set(),edited);
+ assert.notEqual(codeEdit.highlights,edited.highlights);
+ globalThis.activeWindow.Prism={languages:{js:{}},tokenize:text=>[text]};
+ const ready=buildSourceLineDom('intro changed again\n```js\ncode\n```',true,new Set(),edited);
+ assert.notEqual(ready.highlights,edited.highlights);
+ assert.equal(ready.prismPending,false);
+ delete globalThis.activeWindow.Prism;
+});
+test('geometry capture reads each metric once and reuses surviving row records',()=>{
+ let heights=0,tops=0;
+ const elements=[0,1,2].map(i=>({get offsetHeight(){heights++;return i===1?0:20;},get offsetTop(){tops++;return i*20;}}));
+ const map=new SourceMap();map.capture(elements);
+ assert.equal(heights,3);assert.equal(tops,2);
+ const first=map.rows[0];map.capture(elements.slice(0,1));
+ assert.equal(map.rows.length,1);assert.equal(map.rows[0],first);
+});
 test('incremental selection matches full renders, including blur and multiselection',()=>{
  const note='# Heading\n\t**bold** [[Note]]\n```\n**literal**\n```\nlast';
  const dom=buildSourceLineDom(note,true);

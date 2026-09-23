@@ -16,12 +16,19 @@ export class SourceMap {
     private panelHeight = 0;
 
     capture(elements: HTMLElement[]) {
-        this.rows = elements.flatMap((element, index) =>
-            element.offsetHeight > 0
-                ? [{ line: index + 1, top: element.offsetTop,
-                     bottom: element.offsetTop + element.offsetHeight }]
-                : []
-        );
+        let count = 0;
+        for (let index = 0; index < elements.length; index++) {
+            const element = elements[index];
+            const height = element.offsetHeight;
+            if (height <= 0) continue;
+            const top = element.offsetTop;
+            const row = this.rows[count] ?? (this.rows[count] = { line: 0, top: 0, bottom: 0 });
+            row.line = index + 1;
+            row.top = top;
+            row.bottom = top + height;
+            count++;
+        }
+        this.rows.length = count;
     }
 
     clear() { this.rows = []; this.editor = null; }

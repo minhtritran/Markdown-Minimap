@@ -262,6 +262,8 @@ function fillCodeLine(this: void, element: HTMLElement, runs: CodeRun[]) {
 }
 
 export interface SourceLineDom {
+    highlights: CodeHighlights;
+    prismReady: boolean;
     lines: SourceLine[];
     activeLines: ReadonlySet<number>;
     livePreview: boolean;
@@ -286,8 +288,12 @@ export function buildSourceLineDom(
     activeLines: ReadonlySet<number> = new Set(),
     previous?: SourceLineDom
 ): SourceLineDom {
-    const lines = classifySourceLines(markdown);
-    const highlights = collectCodeHighlights(markdown.split(/\r?\n/));
+    const rawLines = markdown.split(/\r?\n/);
+    const incremental = previous && updatePlainLines(rawLines, previous.lines);
+    const lines = incremental || classifySourceLines(markdown);
+    const prismReady = isPrismReady();
+    const highlights = incremental && previous.prismReady === prismReady
+        ? previous.highlights : collectCodeHighlights(rawLines);
     const headingLines: number[] = [];
     const headingLevels: number[] = [];
     const elements: HTMLElement[] = [];
@@ -298,7 +304,7 @@ export function buildSourceLineDom(
         const reusable = previous && previous.livePreview === livePreview &&
             previous.lines.length === lines.length && old?.text === line.text &&
             old.kind === line.kind && old.level === line.level &&
-            line.kind !== "code" && line.kind !== "frontmatter" &&
+            ((line.kind !== "code" && line.kind !== "frontmatter") || previous.highlights === highlights) &&
             previous.activeLines.has(index + 1) === activeLines.has(index + 1);
         if (reusable) {
             elements.push(previous.elements[index]);
@@ -343,6 +349,8 @@ export function buildSourceLineDom(
     });
 
     return {
+        highlights,
+        prismReady,
         lines,
         activeLines: new Set(activeLines),
         livePreview,
@@ -352,6 +360,25 @@ export function buildSourceLineDom(
         headingLevels,
         prismPending: highlights.pending,
     };
+}
+
+/**
+ * A same-length edit inside letter-led prose cannot change block boundaries
+ * when its indentation stays the same. All other changes use the full parser.
+ * In particular, preserve setext paragraph boundaries, fences and frontmatter.
+ */
+export function updatePlainLines(raw: string[], previous: SourceLine[]): SourceLine[] | null {
+    if (raw.length !== previous.length) return null;
+    const lines = previous.slice();
+    for (let index = 0; index < raw.length; index++) {
+        const old = previous[index];
+        if (raw[index] === old.text) continue;
+        const before = /^([\t ]*)\p{L}/u.exec(old.text);
+        const after = /^([\t ]*)\p{L}/u.exec(raw[index]);
+        if (old.kind !== "text" || !before || !after || before[1] !== after[1]) return null;
+        lines[index] = { ...old, text: raw[index] };
+    }
+    return lines;
 }
 
 /** Selection changes cannot change block classification or code highlighting. */
