@@ -1,12 +1,12 @@
-Source Minimap 2.7.2 — prose parsing and geometry costs
+Source Minimap 2.7.3 — avoid editor reflow during typing
 
-- Reuse classification for safe prose edits, with full parsing for structural changes.
-- Reuse code highlighting and rows during those prose edits; invalidate on code or Prism readiness changes.
-- Remove a duplicate geometry pass; read each row metric once and reuse mapping records.
-- Extend the optional console profiler with approximate app heap and minimap element counts; cap collected samples.
+- Preserve the current right-padding reservation during incremental edits instead of removing and recalculating it through repeated layout passes.
+- Stop scheduling two additional full resize passes after each incremental edit.
+- Still refresh typography, document geometry, folds and navigation during edits.
+- Keep full padding recalculation for initial rendering, resizing, theme/settings changes and mode changes; recover if the padding class is missing.
 
-Synthetic 6,000-line typing renderer median improved from 2.011 ms in 2.7.1 to 0.717 ms; at 20,000 lines, 6.830 ms to 4.856 ms. Small notes did not improve in this run. These are JavaScript microbenchmarks, not Obsidian frame times; layout, paint and Prism are excluded. No overall memory reduction is claimed.
+Targets expensive document-metric synchronization identified through in-app profiling. The JavaScript rendering microbenchmark does not measure this browser layout work, so no new timing improvement is claimed until another in-app profile is collected.
 
-Sixteen regression tests and the production build pass, including structural-edit equivalence, highlighting invalidation and geometry read counts. In-app visual, CPU and retained-memory verification remains outstanding. See benchmarks/README.md for the repeatable profiling procedure.
+Seventeen regression tests and the production build pass. Includes a render-lifecycle regression verifying that edits update navigation without triggering resize timers, while full renders retain the settling path. Update through BRAT, reload the plugin, and repeat the same profiler session.
 
 This is a line-based Live Preview approximation, not a complete editor clone. Rich embeds, tables, math, callouts, fences and properties remain source-like in the minimap. Reading view is unchanged.

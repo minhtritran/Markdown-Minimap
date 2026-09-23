@@ -4,6 +4,7 @@ import { build } from 'esbuild';
 // Bundle the shipped modules, not a second implementation of the math.
 const bundle = await build({stdin:{contents:`
 export { requiredEditorPadding } from './src/document-metrics';
+export { Minimap } from './src/minimap';
 export { SourceMap } from './src/source-map';
 export { computeScrollMetrics } from './src/scroll-model';
 export { MinimapPointer } from './src/pointer';
@@ -13,10 +14,20 @@ export { foldEffect, codeFolding } from '@codemirror/language';
 `,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',plugins:[{
 name:'obsidian-test-stub',setup(b){b.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class Component {}; export const MarkdownRenderer = {};'}));}
 }]});
-const {requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,updatePreviewSelection,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const {Minimap,requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,updatePreviewSelection,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const near=(a,b)=>assert.ok(Math.abs(a-b)<0.001,`${a} != ${b}`);
 let passed=0;
 function test(name,fn){fn();passed++;console.log('PASS',name);}
+test('incremental render preserves padding and avoids resize timers while refreshing navigation',()=>{
+ const calls=[];
+ const host={view:{},syncDocumentMetrics:full=>calls.push(['metrics',full]),isReadModeActive:()=>false,
+  getEditorView:()=>null,refreshSourceLayout:()=>calls.push(['map']),applyFolds:()=>{},
+  anchors:{capture:()=>{}},updateSliderScroll:()=>calls.push(['slider']),onResize:()=>calls.push(['resize'])};
+ Minimap.prototype.afterRender.call(host,true);
+ assert.deepEqual(calls,[['metrics',false],['map'],['slider']]);
+ calls.length=0;Minimap.prototype.afterRender.call(host);
+ assert.deepEqual(calls,[['metrics',true],['map'],['slider'],['resize']]);
+});
 // Minimal DOM verifies generated text and row boundaries, not browser layout.
 class TextElement {
  children=[]; className=''; value='';

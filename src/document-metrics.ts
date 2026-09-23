@@ -64,6 +64,7 @@ export interface MirrorOptions {
     readMode: boolean;
     rawSourceMode: boolean;
     hitbox: HTMLElement | null;
+    refreshPadding?: boolean;
 }
 
 /** Pixels needed to keep the editor inside the measured strip boundary. */
@@ -173,9 +174,13 @@ export function mirrorDocumentMetrics(
     // Match the user's working scroller padding + border-box rule. Never
     // resize the source-view wrapper, shift margins, or clip the gutter.
     if (!readMode && scroller && scroller.clientWidth === 0) return;
-    element.classList.remove("source-minimap-auto-padding");
-    element.style.removeProperty("--source-minimap-editor-right-padding");
-    if (!readMode && scroller && options.hitbox) {
+    const refreshPadding = options.refreshPadding !== false || readMode ||
+        !element.classList.contains("source-minimap-auto-padding");
+    if (refreshPadding) {
+        element.classList.remove("source-minimap-auto-padding");
+        element.style.removeProperty("--source-minimap-editor-right-padding");
+    }
+    if (refreshPadding && !readMode && scroller && options.hitbox) {
         const themePadding = pixels(computedStyle(scroller)?.paddingRight);
         const measureStrip = () => {
             const width = measureTextWidth(element, false, sizer);

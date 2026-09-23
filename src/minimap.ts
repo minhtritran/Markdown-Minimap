@@ -456,7 +456,7 @@ export class Minimap implements PointerHost {
 
     // --- measurement ------------------------------------------------------
 
-    syncDocumentMetrics() {
+    syncDocumentMetrics(refreshPadding = true) {
         if (!this.container || !this.content) return;
         mirrorDocumentMetrics({
             element: this.element,
@@ -465,6 +465,7 @@ export class Minimap implements PointerHost {
             readMode: this.isReadModeActive(),
             rawSourceMode: !this.isReadModeActive(),
             hitbox: this.hitbox,
+            refreshPadding,
         });
         this.syncCodeBlockMetrics();
     }
@@ -596,7 +597,7 @@ export class Minimap implements PointerHost {
         this.headingLines = dom.headingLines;
         this.headingLevels = dom.headingLevels;
         this.lineCount = dom.elements.length;
-        this.afterRender();
+        this.afterRender(!!previous);
 
         // Obsidian only loads Prism when it first renders a code block, so a
         // session spent in Source mode may not have it yet and the code above
@@ -745,8 +746,10 @@ export class Minimap implements PointerHost {
         });
     }
 
-    private afterRender() {
-        this.syncDocumentMetrics();
+    private afterRender(incremental = false) {
+        // Text edits do not change the pane or minimap scale. Keep the existing
+        // reservation instead of unpadding/reflowing/re-padding the editor.
+        this.syncDocumentMetrics(!incremental);
         // A re-render rebuilds the panel from the full note, so the note's
         // collapsed sections have to be folded back out of it before anything
         // measures the result.
@@ -762,7 +765,9 @@ export class Minimap implements PointerHost {
             this.hiddenHeadings
         );
         this.updateSliderScroll();
-        void this.onResize();
+        // Actual resize, theme, settings and mode changes still use the full
+        // settling path. Scheduling two more passes for every edit is wasteful.
+        if (!incremental) void this.onResize();
     }
 
     // --- scroll sync ------------------------------------------------------
