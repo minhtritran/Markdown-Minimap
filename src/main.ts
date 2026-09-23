@@ -32,7 +32,7 @@ export default class NoteMinimap extends Plugin {
             for (const note of this.minimapInstances.values()) {
                 if (!note.isReadModeActive() && note.sourceView.contains(update.view.dom) &&
                     (update.docChanged || !note.isRawSourceMode())) {
-                    note.scheduleSourceRender();
+                    note.scheduleSourceRender(update.docChanged);
                 }
             }
         }));
@@ -90,7 +90,7 @@ export default class NoteMinimap extends Plugin {
         // Update previews as needed
         this.debouncedUpdateMinimap = debounce(
             () => {
-                if (this.activeNoteView && !this.minimapInstances.get(this.activeNoteView.contentEl)?.isRawSourceMode())
+                if (this.activeNoteView && this.activeNoteView.getMode() === "preview")
                     void this.updateViewMinimap(this.activeNoteView);
             },
             700,

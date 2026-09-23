@@ -1,0 +1,90 @@
+{
+  "runtime": "v24.19.0",
+  "scope": "JS rendering with a minimal DOM; excludes browser layout, paint, Obsidian and Prism",
+  "results": [
+    {
+      "lines": 1000,
+      "scenario": "open",
+      "medianMs": 1.778,
+      "p95Ms": 12.422,
+      "nodesPerOperation": 6066
+    },
+    {
+      "lines": 1000,
+      "scenario": "cursor-line",
+      "medianMs": 1.509,
+      "p95Ms": 11.988,
+      "nodesPerOperation": 6066
+    },
+    {
+      "lines": 1000,
+      "scenario": "cursor-same-line",
+      "medianMs": 1.385,
+      "p95Ms": 2.442,
+      "nodesPerOperation": 6066
+    },
+    {
+      "lines": 1000,
+      "scenario": "type",
+      "medianMs": 1.432,
+      "p95Ms": 2.718,
+      "nodesPerOperation": 6066
+    },
+    {
+      "lines": 6000,
+      "scenario": "open",
+      "medianMs": 10.624,
+      "p95Ms": 34.465,
+      "nodesPerOperation": 36408
+    },
+    {
+      "lines": 6000,
+      "scenario": "cursor-line",
+      "medianMs": 12.033,
+      "p95Ms": 24.316,
+      "nodesPerOperation": 36408
+    },
+    {
+      "lines": 6000,
+      "scenario": "cursor-same-line",
+      "medianMs": 8.18,
+      "p95Ms": 17.902,
+      "nodesPerOperation": 36408
+    },
+    {
+      "lines": 6000,
+      "scenario": "type",
+      "medianMs": 13.044,
+      "p95Ms": 22.603,
+      "nodesPerOperation": 36408
+    },
+    {
+      "lines": 20000,
+      "scenario": "open",
+      "medianMs": 44.542,
+      "p95Ms": 90.342,
+      "nodesPerOperation": 121348
+    },
+    {
+      "lines": 20000,
+      "scenario": "cursor-line",
+      "medianMs": 40.633,
+      "p95Ms": 67.832,
+      "nodesPerOperation": 121348
+    },
+    {
+      "lines": 20000,
+      "scenario": "cursor-same-line",
+      "medianMs": 39.398,
+      "p95Ms": 84.902,
+      "nodesPerOperation": 121348
+    },
+    {
+      "lines": 20000,
+      "scenario": "type",
+      "medianMs": 41.099,
+      "p95Ms": 60.9,
+      "nodesPerOperation": 121348
+    }
+  ]
+}

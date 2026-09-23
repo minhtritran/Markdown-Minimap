@@ -7,13 +7,13 @@ export { requiredEditorPadding } from './src/document-metrics';
 export { SourceMap } from './src/source-map';
 export { computeScrollMetrics } from './src/scroll-model';
 export { MinimapPointer } from './src/pointer';
-export { applySourceFolds, buildSourceLineDom } from './src/source-view';
+export { applySourceFolds, buildSourceLineDom, updatePreviewSelection } from './src/source-view';
 export { EditorState } from '@codemirror/state';
 export { foldEffect, codeFolding } from '@codemirror/language';
 `,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',plugins:[{
 name:'obsidian-test-stub',setup(b){b.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class Component {}; export const MarkdownRenderer = {};'}));}
 }]});
-const {requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const {requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,updatePreviewSelection,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const near=(a,b)=>assert.ok(Math.abs(a-b)<0.001,`${a} != ${b}`);
 let passed=0;
 function test(name,fn){fn();passed++;console.log('PASS',name);}
@@ -28,6 +28,32 @@ class TextElement {
 globalThis.activeWindow={};globalThis.window={};
 globalThis.activeDocument={createElement:()=>new TextElement(),createDocumentFragment:()=>new TextElement(),createTextNode:text=>({textContent:text})};
 const texts=dom=>dom.elements.map(e=>e.textContent);
+const snapshot=dom=>({text:texts(dom),classes:dom.elements.map(e=>e.className),headings:dom.headingLines,levels:dom.headingLevels});
+test('incremental selection matches full renders, including blur and multiselection',()=>{
+ const note='# Heading\n\t**bold** [[Note]]\n```\n**literal**\n```\nlast';
+ const dom=buildSourceLineDom(note,true);
+ for(const active of [new Set([1]),new Set([2]),new Set([2,3,4]),new Set(),new Set([6])]){
+  updatePreviewSelection(dom,active);
+  assert.deepEqual(snapshot(dom),snapshot(buildSourceLineDom(note,true,active)));
+  const children=dom.elements.map(e=>e.children);
+  assert.equal(updatePreviewSelection(dom,active),false);
+  dom.elements.forEach((e,i)=>assert.equal(e.children,children[i]));
+ }
+});
+test('incremental edits match full renders across structural changes and mode switches',()=>{
+ let dom=buildSourceLineDom('first\nsecond\nlast',true);
+ const revised=buildSourceLineDom('first\nchanged\nlast',true,new Set(),dom);
+ assert.equal(revised.elements[0],dom.elements[0]);
+ assert.notEqual(revised.elements[1],dom.elements[1]);
+ dom=revised;
+ for(const note of ['# head\n\t**bold**\nlast','```\n\t**bold**\n```','---\nkey: value\n---','first\n\nsecond\nlast','first','', '> quote\n- [x] task']){
+  for(const preview of [true,false,true]){
+   const active=new Set([1]);
+   dom=buildSourceLineDom(note,preview,active,dom);
+   assert.deepEqual(snapshot(dom),snapshot(buildSourceLineDom(note,preview,active)));
+  }
+ }
+});
 test('Live Preview keeps literal tabs, blank rows and nested list depth',()=>{
  const input='\tparent\n\t\tchild\n\n\t1. first\n\t\t2. second\n\t- [x] done';
  assert.deepEqual(texts(buildSourceLineDom(input,true)),['\tparent','\t\tchild','\u200b','\t1. first','\t\t2. second','\t• ☑ done']);

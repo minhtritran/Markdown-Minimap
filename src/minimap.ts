@@ -25,6 +25,8 @@ import {
     applySourceFolds,
     sourceFoldSignature,
     buildSourceLineDom,
+    updatePreviewSelection,
+    type SourceLineDom,
 } from "./source-view";
 import { SourceMap } from "./source-map";
 import { isPrismReady, warmPrism } from "./prism";
@@ -67,6 +69,8 @@ export class Minimap implements PointerHost {
     private resizeSettleTimer = 0;
     private resizeTimer = 0;
     private sourceRenderFrame = 0;
+    private sourceDocumentDirty = false;
+    private renderedSource: SourceLineDom | null = null;
 
     readonly anchors = new AnchorTracker();
     private readonly pointer = new MinimapPointer(this);
@@ -318,6 +322,7 @@ export class Minimap implements PointerHost {
         this.container = null;
         this.viewport = null;
         this.content = null;
+        this.renderedSource = null;
         this.slider = null;
         this.hitbox = null;
         this.scroller = null;
@@ -543,7 +548,7 @@ export class Minimap implements PointerHost {
      * Markdown renderer is involved, so nothing appears that the note does not
      * show, and blank lines and frontmatter need no special handling.
      */
-    renderSourceText() {
+    renderSourceText(selectionOnly = false) {
         const file = this.view.file;
         if (!file || !this.content) return;
 
@@ -556,15 +561,35 @@ export class Minimap implements PointerHost {
                 for (let line = start; line <= end; line++) activeLines.add(line);
             }
         }
+        if (selectionOnly && this.renderedSource && !this.isRawSourceMode()) {
+            if (updatePreviewSelection(this.renderedSource, activeLines)) {
+                // Formatting can change wrapping; measure after the DOM writes.
+                this.sourceMap.capture(this.sourceLineElements);
+                this.updateSliderScroll();
+            }
+            return;
+        }
+        const previous = this.renderedSource;
         const dom = buildSourceLineDom(editor?.state.doc.toString() ?? this.view.getViewData(),
-            !this.isRawSourceMode(), activeLines);
+            !this.isRawSourceMode(), activeLines, previous ?? undefined);
+        this.renderedSource = dom;
         this.renderComponent?.unload();
         this.renderComponent = null;
 
-        this.content.empty();
-        this.content.classList.add("source-minimap-content-source");
-        this.addInlineTitle(file.basename);
-        this.content.appendChild(dom.fragment);
+        if (previous) {
+            dom.elements.forEach((element, index) => {
+                const old = previous.elements[index];
+                if (old === element) return;
+                if (old) old.replaceWith(element);
+                else this.content!.appendChild(element);
+            });
+            previous.elements.slice(dom.elements.length).forEach(element => element.remove());
+        } else {
+            this.content.empty();
+            this.content.classList.add("source-minimap-content-source");
+            this.addInlineTitle(file.basename);
+            this.content.appendChild(dom.fragment);
+        }
 
         this.sourceLineElements = dom.elements;
         this.refreshSourceLayout();
@@ -592,11 +617,14 @@ export class Minimap implements PointerHost {
         this.sourceMap.capture(this.sourceLineElements);
     }
 
-    scheduleSourceRender() {
+    scheduleSourceRender(documentChanged = true) {
+        this.sourceDocumentDirty ||= documentChanged;
         if (this.sourceRenderFrame || !this.content) return;
         this.sourceRenderFrame = this.element.ownerDocument.defaultView!.requestAnimationFrame(() => {
             this.sourceRenderFrame = 0;
-            if (this.content && !this.isReadModeActive()) this.renderSourceText();
+            const selectionOnly = !this.sourceDocumentDirty;
+            this.sourceDocumentDirty = false;
+            if (this.content && !this.isReadModeActive()) this.renderSourceText(selectionOnly);
         });
     }
 
@@ -609,10 +637,13 @@ export class Minimap implements PointerHost {
         if (!file || !this.content) return;
 
         if (!this.isReadModeActive()) {
+            // Explicit renders include file/mode/title changes: start fresh.
+            this.renderedSource = null;
             this.renderSourceText();
             return;
         }
         this.content.classList.remove("source-minimap-content-source");
+        this.renderedSource = null;
         this.sourceLineElements = [];
         this.sourceMap.clear();
         this.sourceMapInUse = false;

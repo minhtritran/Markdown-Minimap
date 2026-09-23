@@ -262,6 +262,9 @@ function fillCodeLine(this: void, element: HTMLElement, runs: CodeRun[]) {
 }
 
 export interface SourceLineDom {
+    lines: SourceLine[];
+    activeLines: ReadonlySet<number>;
+    livePreview: boolean;
     fragment: DocumentFragment;
     /** One element per source line, index 0 being line 1. */
     elements: HTMLElement[];
@@ -280,7 +283,8 @@ export function buildSourceLineDom(
     this: void,
     markdown: string,
     livePreview = false,
-    activeLines: ReadonlySet<number> = new Set()
+    activeLines: ReadonlySet<number> = new Set(),
+    previous?: SourceLineDom
 ): SourceLineDom {
     const lines = classifySourceLines(markdown);
     const highlights = collectCodeHighlights(markdown.split(/\r?\n/));
@@ -290,6 +294,20 @@ export function buildSourceLineDom(
     const fragment = activeDocument.createDocumentFragment();
 
     lines.forEach((line, index) => {
+        const old = previous?.lines[index];
+        const reusable = previous && previous.livePreview === livePreview &&
+            previous.lines.length === lines.length && old?.text === line.text &&
+            old.kind === line.kind && old.level === line.level &&
+            line.kind !== "code" && line.kind !== "frontmatter" &&
+            previous.activeLines.has(index + 1) === activeLines.has(index + 1);
+        if (reusable) {
+            elements.push(previous.elements[index]);
+            if (line.kind === "heading") {
+                headingLines.push(index + 1);
+                headingLevels.push(line.level);
+            }
+            return;
+        }
         const element = activeDocument.createElement("div");
         element.className = "source-minimap-source-line";
         if (line.kind === "heading") {
@@ -320,16 +338,37 @@ export function buildSourceLineDom(
             fillLine(element, preview && line.kind === "heading" ? previewHeading(line.text) : line.text, preview);
         }
         elements.push(element);
-        fragment.appendChild(element);
+        // Incremental callers reconcile rows without moving unchanged DOM.
+        if (!previous) fragment.appendChild(element);
     });
 
     return {
+        lines,
+        activeLines: new Set(activeLines),
+        livePreview,
         fragment,
         elements,
         headingLines,
         headingLevels,
         prismPending: highlights.pending,
     };
+}
+
+/** Selection changes cannot change block classification or code highlighting. */
+export function updatePreviewSelection(dom: SourceLineDom, active: ReadonlySet<number>): boolean {
+    let changed = false;
+    for (const number of new Set([...dom.activeLines, ...active])) {
+        if (dom.activeLines.has(number) === active.has(number)) continue;
+        const line = dom.lines[number - 1];
+        if (!line || line.kind === "code" || line.kind === "frontmatter") continue;
+        const element = dom.elements[number - 1];
+        element.textContent = "";
+        const preview = !active.has(number);
+        fillLine(element, preview && line.kind === "heading" ? previewHeading(line.text) : line.text, preview);
+        changed = true;
+    }
+    dom.activeLines = new Set(active);
+    return changed;
 }
 
 /** Apply actual CM fold ranges, without importing its provisional heights. */

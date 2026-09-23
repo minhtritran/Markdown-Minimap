@@ -1,6 +1,6 @@
 {
   "name": "source-minimap",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "Add a minimap to your Markdown notes.",
   "author": "Nymbo",
   "main": "main.js",
@@ -17,7 +17,8 @@
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && node scripts/validate-build.mjs",
     "lint": "tsc -noEmit -skipLibCheck && node scripts/validate-build.mjs",
-    "test": "node tests/regressions.mjs"
+    "test": "node tests/regressions.mjs",
+    "benchmark": "node benchmarks/render.mjs"
   },
   "devDependencies": {
     "@codemirror/language": "^6.12.4",

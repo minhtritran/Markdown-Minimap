@@ -21,6 +21,8 @@ Remove earlier minimap CSS overrides for fixed widths, padding, line heights or 
 
 ## Verification and limits
 
+Performance: selection changes update only affected rows, ordinary edits reuse unchanged rows, and the duplicate Live Preview refresh is removed. Run `npm run benchmark`; see [benchmark results and in-app profiling instructions](benchmarks/README.md) for measurements and limits.
+
 `npm ci && npm test && npm run build` runs the regression tests, TypeScript checks and release-file validation.
 Tests cover line mapping in both directions, wrapped lines, changing editor height estimates, folds, click/drag navigation and scroll endpoints.
 `node tests/layout-fixture.mjs` writes `/tmp/minimap-layout.html`, a browser fixture for resize, tab and wrapping checks. It uses representative editor markup, not Obsidian itself.
