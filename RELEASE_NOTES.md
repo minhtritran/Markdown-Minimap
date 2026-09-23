@@ -1,5 +1,8 @@
-Source Minimap 2.7.5 — stable width while typing
+Source Minimap 2.7.6 — resync the viewport marker after tab changes
 
-Fix incremental edits remeasuring the minimap wrapping width from a rendered editor line. Preserve the established width during typing; resize, theme, settings and mode changes still remeasure. Missing widths initialize normally, and hidden zero-width measurements retain the last valid width.
+- Reject collapsed or stale editor block geometry when preparing the minimap source map.
+- Hide the editing-mode marker while its document snapshot or source map is invalid rather than drawing a full-track fallback highlight.
+- Listen for CodeMirror geometry/viewport changes and coalesce marker resynchronization into an animation frame, without rebuilding the document or recalculating width.
+- Cancel the pending synchronization frame on destruction. Legitimate short-note highlights remain supported.
 
-Twenty regression tests and the production build pass. The new test checks stable width across varying edit-time measurements, resize updates and hidden-pane preservation. In-app confirmation of the reported width-shifting regression is still needed.
+Twenty-two regression tests and the production build pass, including geometry recovery and coalesced synchronization. The reported intermittent full-minimap highlight still needs in-app confirmation after updating through BRAT.

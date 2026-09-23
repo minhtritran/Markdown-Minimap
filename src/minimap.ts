@@ -69,6 +69,8 @@ export class Minimap implements PointerHost {
     private resizeSettleTimer = 0;
     private resizeTimer = 0;
     private sourceRenderFrame = 0;
+    private viewportSyncFrame = 0;
+    private renderedEditorDoc: EditorView["state"]["doc"] | null = null;
     private hiddenDirty = false;
 
     private deferWhileHidden(): boolean {
@@ -313,6 +315,8 @@ export class Minimap implements PointerHost {
         this.renderVersion++; // invalidate any in-flight render
         window.clearTimeout(this.resizeTimer);
         this.element.ownerDocument.defaultView?.cancelAnimationFrame(this.sourceRenderFrame);
+        this.element.ownerDocument.defaultView?.cancelAnimationFrame(this.viewportSyncFrame);
+        this.renderedEditorDoc = null;
         window.clearTimeout(this.trailingSyncTimer);
         window.clearTimeout(this.resizeSettleTimer);
         window.clearTimeout(this.foldCheckTimer);
@@ -594,6 +598,7 @@ export class Minimap implements PointerHost {
         const dom = buildSourceLineDom(editor?.state.doc.toString() ?? this.view.getViewData(),
             !this.isRawSourceMode(), activeLines, previous ?? undefined);
         this.renderedSource = dom;
+        this.renderedEditorDoc = editor?.state.doc ?? null;
         this.renderComponent?.unload();
         this.renderComponent = null;
 
@@ -635,6 +640,16 @@ export class Minimap implements PointerHost {
     private refreshSourceLayout() {
         applySourceFolds(this.sourceLineElements, this.getEditorView());
         this.sourceMap.capture(this.sourceLineElements);
+    }
+
+    scheduleViewportSync() {
+        if (this.deferWhileHidden() || this.viewportSyncFrame || this.sourceRenderFrame) return;
+        this.viewportSyncFrame = this.element.ownerDocument.defaultView!.requestAnimationFrame(() => {
+            this.viewportSyncFrame = 0;
+            if (this.deferWhileHidden()) return;
+            if (!this.isReadModeActive()) this.refreshSourceLayout();
+            this.updateSliderScroll();
+        });
     }
 
     scheduleSourceRender(documentChanged = true) {
@@ -922,6 +937,12 @@ export class Minimap implements PointerHost {
         if (!this.codeMetricsMirrored) this.syncCodeBlockMetrics();
 
         const metrics = this.getScrollMetrics();
+        if (!this.isReadModeActive() &&
+            (this.getEditorView()?.state.doc !== this.renderedEditorDoc || !this.sourceMapInUse)) {
+            this.slider.style.visibility = "hidden";
+            return;
+        }
+        this.slider.style.visibility = "";
         const sliderTop =
             (this.topOffset || 0) +
             clamp(

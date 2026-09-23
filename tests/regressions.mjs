@@ -146,6 +146,30 @@ function editor(heights){
  blocks.forEach(b=>b.bottom=b.top+b.height);
  return {state:{doc:{lines:heights.length,line:n=>({from:(n-1)*10}),lineAt:pos=>({number:Math.floor(pos/10)+1})}},lineBlockAt:pos=>blocks[Math.floor(pos/10)],lineBlockAtHeight:y=>blocks.find(b=>y<b.bottom)??blocks.at(-1)};
 }
+test('source map rejects collapsed tab-transition geometry and recovers when measured',()=>{
+ const map=new SourceMap();
+ map.capture([{offsetTop:0,offsetHeight:20},{offsetTop:20,offsetHeight:20},{offsetTop:40,offsetHeight:20}]);
+ assert.equal(map.prepare(editor([0,0,0]),0,500,60),false);
+ assert.equal(map.prepare(editor([20]),0,500,60),false);
+ assert.equal(map.prepare(editor([20,20,20]),0,500,60),true);
+ near(map.toMinimap(30),30);
+ const widget=editor([20,20,20]);
+ widget.lineBlockAt=()=>({from:0,to:29,top:0,bottom:60,height:60});
+ assert.equal(map.prepare(widget,0,500,60),true);
+ // A genuinely short note can legitimately highlight its entire minimap.
+ map.capture([{offsetTop:0,offsetHeight:20}]);
+ assert.equal(map.prepare(editor([20]),0,500,20),true);
+});
+test('editor geometry updates coalesce and do not rerender the document',()=>{
+ const note=Object.create(Minimap.prototype);let callback,requests=0,measures=0,updates=0;
+ note.deferWhileHidden=()=>false;
+ note.element={ownerDocument:{defaultView:{requestAnimationFrame:fn=>{requests++;callback=fn;return 1;}}}};
+ note.isReadModeActive=()=>false;note.refreshSourceLayout=()=>measures++;
+ note.updateSliderScroll=()=>updates++;
+ note.scheduleViewportSync();note.scheduleViewportSync();
+ assert.equal(requests,1);callback();assert.equal(measures,1);assert.equal(updates,1);
+ note.sourceRenderFrame=2;note.scheduleViewportSync();assert.equal(requests,1);
+});
 const rows=[{offsetTop:20,offsetHeight:20},{offsetTop:40,offsetHeight:60},{offsetTop:100,offsetHeight:20}];
 test('line mapping handles wrapped text, top margin and scroll-past-end in both directions',()=>{
  const map=new SourceMap();map.capture(rows);assert.ok(map.prepare(editor([20,40,20]),30,150,170));

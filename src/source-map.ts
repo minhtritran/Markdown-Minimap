@@ -38,8 +38,16 @@ export class SourceMap {
         this.offset = offset;
         this.editorHeight = editorHeight;
         this.panelHeight = panelHeight;
-        return !!editor && this.rows.length > 0 &&
-            this.rows[this.rows.length - 1].line <= editor.state.doc.lines;
+        if (!editor || this.rows.length === 0 ||
+            this.rows[this.rows.length - 1].line > editor.state.doc.lines) return false;
+        const first = this.block(this.rows[0]);
+        const last = this.block(this.rows[this.rows.length - 1]);
+        // A revealed CM view can briefly report collapsed/stale block geometry.
+        return Number.isFinite(first.top) && Number.isFinite(last.bottom) &&
+            last.bottom > first.top &&
+            (this.rows.length === 1 || last.top > first.top ||
+                // A real Live Preview widget may cover several source lines.
+                first.to >= editor.state.doc.line(this.rows[this.rows.length - 1].line).from);
     }
 
     private rowAt(value: number, key: "line" | "top") {

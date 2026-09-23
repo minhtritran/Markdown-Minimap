@@ -30,11 +30,13 @@ export default class NoteMinimap extends Plugin {
     async onload() {
         this.stopped = false;
         this.registerEditorExtension(EditorView.updateListener.of((update) => {
-            if (!update.docChanged && !update.selectionSet && !update.focusChanged) return;
+            if (!update.docChanged && !update.selectionSet && !update.focusChanged &&
+                !update.geometryChanged && !update.viewportChanged) return;
             for (const note of this.minimapInstances.values()) {
-                if (!note.isReadModeActive() && note.sourceView.contains(update.view.dom) &&
-                    (update.docChanged || !note.isRawSourceMode())) {
-                    note.scheduleSourceRender(update.docChanged);
+                if (!note.isReadModeActive() && note.sourceView.contains(update.view.dom)) {
+                    if (update.docChanged || ((!note.isRawSourceMode()) && (update.selectionSet || update.focusChanged)))
+                        note.scheduleSourceRender(update.docChanged);
+                    if (update.geometryChanged || update.viewportChanged) note.scheduleViewportSync();
                 }
             }
         }));
