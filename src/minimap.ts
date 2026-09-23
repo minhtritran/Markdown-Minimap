@@ -364,7 +364,8 @@ export class Minimap implements PointerHost {
         this.centerOnClick = settings.centerOnClick;
 
         this.backgroundColor = toRGBAAlpha(
-            this.element.getCssPropertyValue("background-color"),
+            this.element.getCssPropertyValue("--background-primary").trim() ||
+                this.element.getCssPropertyValue("background-color"),
             this.minimapOpacity
         );
 

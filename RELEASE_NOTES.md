@@ -1,8 +1,7 @@
-Source Minimap 2.7.6 — resync the viewport marker after tab changes
+Source Minimap 2.7.7 — light-theme contrast
 
-- Reject collapsed or stale editor block geometry when preparing the minimap source map.
-- Hide the editing-mode marker while its document snapshot or source map is invalid rather than drawing a full-track fallback highlight.
-- Listen for CodeMirror geometry/viewport changes and coalesce marker resynchronization into an animation frame, without rebuilding the document or recalculating width.
-- Cancel the pending synchronization frame on destruction. Legitimate short-note highlights remain supported.
+Use the theme's primary note background for the minimap instead of a potentially transparent container color. Preserve fully transparent fallback colors rather than turning transparent black into a grey overlay.
 
-Twenty-two regression tests and the production build pass, including geometry recovery and coalesced synchronization. The reported intermittent full-minimap highlight still needs in-app confirmation after updating through BRAT.
+In light themes, tint the viewport marker with the theme accent and add an inset outline. Existing background, text and marker opacity settings continue to apply. Dark-theme marker styling is unchanged.
+
+Twenty-three regression tests and the production build pass. Visual confirmation in the user's Obsidian theme remains outstanding.

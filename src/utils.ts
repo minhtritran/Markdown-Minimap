@@ -72,6 +72,9 @@ export function toRGBAAlpha(this: void, color: string, alpha: number): string {
         // rgb or rgba
         const nums = color.match(/[\d.]+/g);
         if (nums && nums.length >= 3) {
+            // A transparent container is not a black surface. Retinting its
+            // RGB channels would create a grey overlay on a light editor.
+            if (nums.length >= 4 && Number(nums[3]) === 0) return "transparent";
             return `rgba(${nums[0]},${nums[1]},${nums[2]},${alpha})`;
         }
     }

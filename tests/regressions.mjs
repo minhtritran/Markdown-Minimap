@@ -5,6 +5,7 @@ import { build } from 'esbuild';
 const bundle = await build({stdin:{contents:`
 export { requiredEditorPadding, syncTextWidth } from './src/document-metrics';
 export { Minimap } from './src/minimap';
+export { toRGBAAlpha } from './src/utils';
 export { SourceMap } from './src/source-map';
 export { computeScrollMetrics } from './src/scroll-model';
 export { MinimapPointer } from './src/pointer';
@@ -14,10 +15,15 @@ export { foldEffect, codeFolding } from '@codemirror/language';
 `,resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'node',plugins:[{
 name:'obsidian-test-stub',setup(b){b.onResolve({filter:/^obsidian$/},()=>({path:'obsidian',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class Component {}; export const MarkdownRenderer = {};'}));}
 }]});
-const {syncTextWidth,Minimap,requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,updatePreviewSelection,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const {toRGBAAlpha,syncTextWidth,Minimap,requiredEditorPadding,SourceMap,computeScrollMetrics,MinimapPointer,applySourceFolds,buildSourceLineDom,updatePreviewSelection,EditorState,foldEffect,codeFolding} = await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const near=(a,b)=>assert.ok(Math.abs(a-b)<0.001,`${a} != ${b}`);
 let passed=0;
 function test(name,fn){fn();passed++;console.log('PASS',name);}
+test('transparent backgrounds do not become grey overlays; theme colors retain requested opacity',()=>{
+ assert.equal(toRGBAAlpha('rgba(0, 0, 0, 0)',.3),'transparent');
+ assert.equal(toRGBAAlpha('#fff',.3),'rgba(255,255,255,0.3)');
+ assert.equal(toRGBAAlpha('rgb(30, 30, 30)',.3),'rgba(30,30,30,0.3)');
+});
 test('typing cannot change wrapping width; resize can, and hidden measurements retain it',()=>{
  let value='',reads=0;
  const container={style:{getPropertyValue:()=>value,setProperty:(_,v)=>{value=v;}}};
